@@ -13,22 +13,22 @@ someFunc :: IO ()
 someFunc = putStrLn "someFunc"
 
 s0 :: Signal 0
-s0 = Comb (gate) V.Nil
+s0 = comb gate V.Nil
 
 s1 :: Signal 1
-s1 = Sample' s0
+s1 = sample' s0
 
 s6 :: Signal 6
-s6 = Sample s1
+s6 = sample s1
 
 s3 :: Signal 3
-s3 = Reg s0 s6
+s3 = reg s0 s6
 
 s42 :: Signal 2 -> Signal 4
-s42 x = Sample x
+s42 x = sample x
 
 s2 :: (KnownNat a, 1 <= a) => Signal a -> Signal (2*a)
-s2 x = Sample x
+s2 x = sample x
 
 
 

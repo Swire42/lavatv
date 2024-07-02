@@ -34,19 +34,19 @@ instance Hard HBool where
     lift2 f a b = HBool $ f (sig a) (sig b)
 
 htrue :: forall clk. Clock clk => HBool clk
-htrue = HBool $ Comb (Gate { smt2= \V.Nil -> "true" }) V.Nil
+htrue = HBool $ comb (gate { smt2= \V.Nil -> "true" }) V.Nil
 
 hfalse :: forall clk. Clock clk => HBool clk
-hfalse = HBool $ Comb (Gate { smt2= \V.Nil -> "false" }) V.Nil
+hfalse = HBool $ comb (gate { smt2= \V.Nil -> "false" }) V.Nil
 
 hnot :: forall clk. Clock clk => HBool clk -> HBool clk
-hnot = lift1 $ Comb Gate{ smt2=(\(x `V.Cons` V.Nil) -> "(not "++x++")") } . V.construct1
+hnot = lift1 $ comb gate { smt2=(\(x `V.Cons` V.Nil) -> "(not "++x++")") } . V.construct1
 
 hand :: forall clk. Clock clk => HBool clk -> HBool clk -> HBool clk
-hand = lift2 $ curry $ Comb Gate{ smt2=(\(x `V.Cons` (y `V.Cons` V.Nil)) -> "(and "++x++" "++y++")") } . V.construct2
+hand = lift2 $ curry $ comb gate { smt2=(\(x `V.Cons` (y `V.Cons` V.Nil)) -> "(and "++x++" "++y++")") } . V.construct2
 
 hor :: forall clk. Clock clk => HBool clk -> HBool clk -> HBool clk
-hor = lift2 $ curry $ Comb Gate{ smt2=(\(x `V.Cons` (y `V.Cons` V.Nil)) -> "(or "++x++" "++y++")") } . V.construct2
+hor = lift2 $ curry $ comb gate { smt2=(\(x `V.Cons` (y `V.Cons` V.Nil)) -> "(or "++x++" "++y++")") } . V.construct2
 
 pulse :: forall clk. LiveClock clk => () -> HBool clk
 pulse () = x
@@ -56,7 +56,7 @@ ite :: forall h clk. (Hard h, Clock clk) => HBool clk -> (h clk, h clk) -> h clk
 ite cond = uncurry $ lift2 $ sigite (sig cond)
     where
         sigite :: Signal clk -> Signal clk -> Signal clk -> Signal clk
-        sigite sigc sigt sigf = Comb Gate{ smt2=(V.destruct3 >>> \(c, t, f) -> "(ite "++c++" "++t++" "++f++")") } $ V.construct3 (sigc, sigt, sigf)
+        sigite sigc sigt sigf = comb gate { smt2=(V.destruct3 >>> \(c, t, f) -> "(ite "++c++" "++t++" "++f++")") } $ V.construct3 (sigc, sigt, sigf)
 
 ite' :: forall h clk. (Hard h, Clock clk) => HBool clk -> HP.HPair h h clk -> h clk
 ite' cond pair = ite cond (HP.unHPair pair)

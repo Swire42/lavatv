@@ -12,6 +12,7 @@ module Lavatv.Core (
 , Lavatv.Core.gate
 , Lavatv.Core.Signal(..)
 , Lavatv.Core.Hard(..)
+, Lavatv.Core.comb
 , Lavatv.Core.sample'
 , Lavatv.Core.sample
 , Lavatv.Core.reg
@@ -21,6 +22,7 @@ module Lavatv.Core (
 import Prelude
 
 import Lavatv.Nat
+import Lavatv.Uniq
 import qualified Lavatv.Vec as V
 
 type Vec = V.Vec
@@ -35,17 +37,22 @@ data Gate (n :: Nat) = Gate { smt2 :: Vec n String -> String }
 gate :: Gate _
 gate = Gate { smt2=undefined }
 
-data Signal (clk :: Nat) where
-    Comb :: forall n clk. (KnownNat n, Clock clk) => Gate n -> Vec n (Signal clk) -> Signal clk
-    Sample' :: forall clk. Clock clk => Signal 0 -> Signal clk
-    Sample :: forall k clk. (KnownNat k, 1 <= k, LiveClock clk) => Signal clk -> Signal (k*clk)
-    Reg :: forall k clk. (KnownNat k, 1 <= k, LiveClock clk) => Signal 0 -> Signal (k*clk) -> Signal clk
+data Signal_ (clk :: Nat) where
+    Comb :: forall n clk. (KnownNat n, Clock clk) => Gate n -> Vec n (Signal clk) -> Signal_ clk
+    Sample' :: forall clk. Clock clk => Signal 0 -> Signal_ clk
+    Sample :: forall k clk. (KnownNat k, 1 <= k, LiveClock clk) => Signal clk -> Signal_ (k*clk)
+    Reg :: forall k clk. (KnownNat k, 1 <= k, LiveClock clk) => Signal 0 -> Signal (k*clk) -> Signal_ clk
+
+data Signal (clk :: Nat) = Signal { uniq :: Uniq, signal :: Signal_ clk }
+
+makeSignal :: Signal_ clk -> Signal clk
+makeSignal signal_ = Signal { uniq=makeUniq (), signal=signal_ }
 
 instance Show (Signal clk) where
-    show (Comb g l) = (smt2 g) (V.map show l)
-    show (Sample' x) = show x
-    show (Sample x) = show x
-    show (Reg i (x :: Signal (k*a))) = show i ++ " -" ++ show (valueOf @clk) ++ "> " ++ show x
+    show (Signal { uniq=u, signal=Comb g l }) = show u ++ (smt2 g) (V.map show l)
+    show (Signal { uniq=u, signal=Sample' x}) = show u ++ show x
+    show (Signal { uniq=u, signal=Sample x}) = show u ++ show x
+    show (Signal { uniq=u, signal=Reg i (x :: Signal (k*a))}) = show i ++ " -" ++ show u ++ show (valueOf @clk) ++ "> " ++ show x
 
 class Hard h where
     dontCare :: forall a. (Clock a) => () -> h a
@@ -57,14 +64,17 @@ instance Hard Signal where
     lift1 = id
     lift2 = id
 
+comb :: forall n clk. (KnownNat n, Clock clk) => Gate n -> Vec n (Signal clk) -> Signal clk
+comb g ins = makeSignal $ Comb g ins
+
 sample' :: forall h clk. (Hard h, Clock clk) => h 0 -> h clk
-sample' = lift1 Sample'
+sample' = lift1 (makeSignal . Sample')
 
 sample :: forall h k clk. (Hard h, KnownNat k, 1 <= k, LiveClock clk) => h clk -> h (k*clk)
-sample = lift1 Sample
+sample = lift1 (makeSignal . Sample)
 
 reg :: forall h k clk. (Hard h, KnownNat k, 1 <= k, LiveClock clk) => h 0 -> h (k*clk) -> h clk
-reg = lift2 Reg
+reg = lift2 (\x y -> makeSignal $ Reg x y)
 
 delay :: forall h clk. (Hard h, LiveClock clk) => h 0 -> h clk -> h clk
 delay i n = reg @_ @1 i n
