@@ -4,10 +4,12 @@ import Prelude
 
 import Lavatv.Nat
 import qualified Lavatv.Vec as V
+import qualified Lavatv.HVec as HV
 
 import Lavatv.Core
 import Lavatv.HBool
 import Lavatv.BV
+import Lavatv.Retime
 
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"

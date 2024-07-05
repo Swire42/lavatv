@@ -10,7 +10,9 @@ module Lavatv.Core (
 , Lavatv.Core.LiveClock
 , Lavatv.Core.Gate(..)
 , Lavatv.Core.gate
+, Lavatv.Core.Signal_(..)
 , Lavatv.Core.Signal(..)
+, Lavatv.Core.makeSignal
 , Lavatv.Core.Hard(..)
 , Lavatv.Core.comb
 , Lavatv.Core.sample'
@@ -52,7 +54,7 @@ instance Show (Signal clk) where
     show (Signal { uniq=u, signal=Comb g l }) = show u ++ (smt2 g) (V.map show l)
     show (Signal { uniq=u, signal=Sample' x}) = show u ++ show x
     show (Signal { uniq=u, signal=Sample x}) = show u ++ show x
-    show (Signal { uniq=u, signal=Reg i (x :: Signal (k*a))}) = show i ++ " -" ++ show u ++ show (valueOf @clk) ++ "> " ++ show x
+    show (Signal { uniq=u, signal=Reg @k i x}) = show i ++ " -" ++ show u ++ show (valueOf @clk) ++ "> " ++ show x
 
 class Hard h where
     dontCare :: forall a. (Clock a) => () -> h a

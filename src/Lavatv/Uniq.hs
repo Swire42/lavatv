@@ -15,7 +15,7 @@ import Prelude
 import Data.IORef
 import System.IO.Unsafe(unsafePerformIO)
 
-newtype Uniq = Uniq { uniqVal :: Int }
+newtype Uniq = Uniq { uniqVal :: Int } deriving Eq
 
 {-# NOINLINE count #-}
 -- Global unique values counter
