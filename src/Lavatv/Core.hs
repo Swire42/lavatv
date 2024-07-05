@@ -79,7 +79,7 @@ sigwise0 :: forall h clk. (Hard h, Clock clk) => Gate 0 -> () -> h clk
 sigwise0 g () = pack $ map (\_ -> comb g V.Nil) $ replicate (sigsCount @h) ()
 
 dontCare :: forall h clk. (Hard h, Clock clk) => () -> h clk
-dontCare () = sigwise0 undefined ()
+dontCare () = sigwise0 (gate {smt2=Just (\_ -> "???")}) ()
 
 sigwise1 :: forall h1 h2 clk. (Hard h1, Hard h2, Clock clk) => Gate 1 -> h1 clk -> h2 clk
 sigwise1 g = pack . map (comb g . V.construct1) . unpack
