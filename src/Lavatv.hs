@@ -10,6 +10,7 @@ import Lavatv.Core
 import Lavatv.HBool
 import Lavatv.BV
 import Lavatv.Retime
+import Lavatv.Sim
 
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"

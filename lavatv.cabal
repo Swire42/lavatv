@@ -66,6 +66,7 @@ library
         Lavatv.Nat
         Lavatv.Vec
         Lavatv.Core
+        Lavatv.Sim
         Lavatv.Uniq
         Lavatv.Retime
         Lavatv.HBool

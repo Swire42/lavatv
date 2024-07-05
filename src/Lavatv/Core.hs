@@ -25,6 +25,7 @@ module Lavatv.Core (
 ) where
 
 import Prelude
+import Data.Dynamic
 
 import Lavatv.Nat
 import Lavatv.Uniq
@@ -37,14 +38,14 @@ type Vec = V.Vec
 type Clock clk = KnownNat clk
 type LiveClock clk = (KnownNat clk, 1 <= clk)
 
-data Gate (n :: Nat) = Gate { smt2 :: Vec n String -> String }
+data Gate (n :: Nat) = Gate { smt2 :: Vec n String -> String, sim :: Vec n Dynamic -> Dynamic }
 
 gate :: Gate _
-gate = Gate { smt2=undefined }
+gate = Gate { smt2=undefined, sim=undefined }
 
 data Signal_ (clk :: Nat) where
     Comb :: forall n clk. (KnownNat n, Clock clk) => Gate n -> Vec n (Signal clk) -> Signal_ clk
-    Sample' :: forall clk. Clock clk => Signal 0 -> Signal_ clk
+    Sample' :: forall clk. LiveClock clk => Signal 0 -> Signal_ clk
     Sample :: forall k clk. (KnownNat k, 1 <= k, LiveClock clk) => Signal clk -> Signal_ (k*clk)
     Reg :: forall k clk. (KnownNat k, 1 <= k, LiveClock clk) => Signal 0 -> Signal (k*clk) -> Signal_ clk
 
@@ -76,13 +77,13 @@ comb g ins = makeSignal $ Comb g ins
 sigwise0 :: forall h clk. (Hard h, Clock clk) => Gate 0 -> () -> h clk
 sigwise0 g () = pack $ map (\_ -> comb g V.Nil) $ replicate (sigsCount @h) ()
 
-sigwise1 :: forall h clk. (Hard h, Clock clk) => Gate 1 -> h clk -> h clk
+sigwise1 :: forall h1 h2 clk. (Hard h1, Hard h2, Clock clk) => Gate 1 -> h1 clk -> h2 clk
 sigwise1 g = pack . map (comb g . V.construct1) . unpack
 
 sigwise2 :: forall h clk. (Hard h, Clock clk) => Gate 2 -> h clk -> h clk -> h clk
 sigwise2 g a b = pack $ map (comb g . V.construct2) $ unpack a `zip` unpack b
 
-sample' :: forall h clk. (Hard h, Clock clk) => h 0 -> h clk
+sample' :: forall h clk. (Hard h, LiveClock clk) => h 0 -> h clk
 sample' = pack . map (makeSignal . Sample') . unpack
 
 sample :: forall h k clk. (Hard h, KnownNat k, 1 <= k, LiveClock clk) => h clk -> h (k*clk)
