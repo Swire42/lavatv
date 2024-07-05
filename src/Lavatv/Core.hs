@@ -80,7 +80,7 @@ sigwise0 g () = pack $ map (\_ -> comb g V.Nil) $ replicate (sigsCount @h) ()
 sigwise1 :: forall h1 h2 clk. (Hard h1, Hard h2, Clock clk) => Gate 1 -> h1 clk -> h2 clk
 sigwise1 g = pack . map (comb g . V.construct1) . unpack
 
-sigwise2 :: forall h clk. (Hard h, Clock clk) => Gate 2 -> h clk -> h clk -> h clk
+sigwise2 :: forall h1 h2 h3 clk. (Hard h1, Hard h2, Hard h3, Clock clk) => Gate 2 -> h1 clk -> h2 clk -> h3 clk
 sigwise2 g a b = pack $ map (comb g . V.construct2) $ unpack a `zip` unpack b
 
 sample' :: forall h clk. (Hard h, LiveClock clk) => h 0 -> h clk
