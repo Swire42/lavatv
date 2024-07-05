@@ -5,12 +5,15 @@ import Prelude
 import Lavatv.Nat
 import qualified Lavatv.Vec as V
 import qualified Lavatv.HVec as HV
+import qualified Lavatv.Batch as B
 
 import Lavatv.Core
 import Lavatv.HBool
 import Lavatv.BV
 import Lavatv.Retime
 import Lavatv.Sim
+
+type HVec = HV.HVec
 
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"
@@ -58,6 +61,10 @@ tmap2 (f :: forall a. Bit a -> Bit a) (x :: Bit clk, y :: Bit clk) = (fx :: Bit 
     fz = f z
     fx = reg zeros $ delay zeros fz
     fy = reg zeros fz
+
+tmap2b (f :: forall a. Bit a -> Bit a) (xs :: HVec 2 Bit clk) = (fxs :: HVec 2 Bit clk)
+  where
+    fxs = B.collect (HV.HVec $ V.replicate zeros) $ B.lift f $ B.sweep xs
 
 sim3 :: forall clk. (LiveClock clk) => Sim Int clk -> Sim Int clk
 sim3 y = reg @_ @3 (simLift0 0) x

@@ -15,6 +15,8 @@ module Lavatv.Batch (
   Lavatv.Batch.pulse,
   Lavatv.Batch.pulseMux,
   Lavatv.Batch.sweepMux,
+  Lavatv.Batch.sweep,
+  Lavatv.Batch.collect,
   Lavatv.Batch.update,
   Lavatv.Batch.zip,
   Lavatv.Batch.unzip,
@@ -70,9 +72,19 @@ pulse = Batch $ V.select @i @n x
 pulseMux :: forall i n h clk. (KnownNat i, KnownNat n, (i+1) <= n, 1 <= n, Hard h, LiveClock clk) => Batch n h clk -> Batch n h clk -> Batch n h clk
 pulseMux rare often = zipWithRaw (HB.ite') (pulse @i @n) (zip rare often)
 
--- Iterate through the values of a Vec
-sweepMux :: forall n h clk. (KnownNat n, 1 <= n, Hard h) => HVec n h clk -> Batch n h clk
-sweepMux = error "todo"
+-- Iterate through the values of a Vec over n base ticks
+sweepMux :: forall n h clk. (KnownNat n, 1 <= n, Hard h, LiveClock clk) => HVec n h clk -> Batch n h clk
+sweepMux v = Batch $ V.select @0 $ HV.unHVec $ unBatch shreg
+  where
+    shreg = shiftReset (Batch @n v) (lift (HV.HVec . V.rotateL . HV.unHVec) shreg) -- note: highly inneficient
+
+-- Iterate through the values of a Vec in a single base tick
+sweep :: forall n h clk. (KnownNat n, 1 <= n, Hard h, LiveClock clk, 1 <= (n * clk)) => HVec n h clk -> Batch n h (n*clk)
+sweep = sweepMux . sample
+
+-- Iterate through the values of a Vec in a single base tick
+collect :: forall n h clk. (KnownNat n, 1 <= n, Hard h, LiveClock clk, 1 <= (n * clk)) => HVec n h 0 -> Batch n h (n*clk) -> HVec n h clk
+collect ini b = reg @_ @n @clk ini $ HV.HVec $ V.reverse $ V.map unBatch $ V.iterate @n (shift (dontCare () :: h 0)) b
 
 -- Apply f every n fast ticks, with an offset of i
 update :: forall i n h clk. (KnownNat i, KnownNat n, (i+1) <= n, 1 <= n, Hard h, LiveClock clk) => (h clk -> h clk) -> Batch n h clk -> Batch n h clk

@@ -6,7 +6,7 @@ License     : MIT
 -}
 
 module Lavatv.HVec (
-  Lavatv.HVec.HVec
+  Lavatv.HVec.HVec(..)
 ) where
 
 import Prelude
