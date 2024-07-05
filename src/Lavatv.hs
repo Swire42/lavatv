@@ -59,3 +59,7 @@ tmap2 (f :: forall a. Bit a -> Bit a) (x :: Bit clk, y :: Bit clk) = (fx :: Bit 
     fx = reg zeros $ delay zeros fz
     fy = reg zeros fz
 
+sim3 :: forall clk. (LiveClock clk) => Sim Int clk -> Sim Int clk
+sim3 y = reg @_ @3 (simLift0 0) x
+  where
+    x :: Sim Int (3*clk) = (simLift2 (+)) (delay (simLift0 0) x) (sample @_ @3 y)
