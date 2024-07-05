@@ -15,6 +15,9 @@ module Lavatv.Core (
 , Lavatv.Core.makeSignal
 , Lavatv.Core.Hard(..)
 , Lavatv.Core.comb
+, Lavatv.Core.sigwise0
+, Lavatv.Core.sigwise1
+, Lavatv.Core.sigwise2
 , Lavatv.Core.sample'
 , Lavatv.Core.sample
 , Lavatv.Core.reg
@@ -57,26 +60,36 @@ instance Show (Signal clk) where
     show (Signal { uniq=u, signal=Reg @k i x}) = show i ++ " -" ++ show u ++ show (valueOf @clk) ++ "> " ++ show x
 
 class Hard h where
-    dontCare :: forall a. (Clock a) => () -> h a
-    lift1 :: forall a b. (Clock a, Clock b) => (Signal a -> Signal b) -> h a -> h b
-    lift2 :: forall a b c. (Clock a, Clock b, Clock c) => (Signal a -> Signal b -> Signal c) -> h a -> h b -> h c
+    sigsCount :: Int
+    unpack :: h clk -> [Signal clk]
+    pack :: [Signal clk] -> h clk
 
 instance Hard Signal where
-    dontCare = undefined
-    lift1 = id
-    lift2 = id
+    sigsCount = 1
+    unpack x = [x]
+    pack [x] = x
+    pack _ = error "bad size"
 
 comb :: forall n clk. (KnownNat n, Clock clk) => Gate n -> Vec n (Signal clk) -> Signal clk
 comb g ins = makeSignal $ Comb g ins
 
+sigwise0 :: forall h clk. (Hard h, Clock clk) => Gate 0 -> () -> h clk
+sigwise0 g () = pack $ map (\_ -> comb g V.Nil) $ replicate (sigsCount @h) ()
+
+sigwise1 :: forall h clk. (Hard h, Clock clk) => Gate 1 -> h clk -> h clk
+sigwise1 g = pack . map (comb g . V.construct1) . unpack
+
+sigwise2 :: forall h clk. (Hard h, Clock clk) => Gate 2 -> h clk -> h clk -> h clk
+sigwise2 g a b = pack $ map (comb g . V.construct2) $ unpack a `zip` unpack b
+
 sample' :: forall h clk. (Hard h, Clock clk) => h 0 -> h clk
-sample' = lift1 (makeSignal . Sample')
+sample' = pack . map (makeSignal . Sample') . unpack
 
 sample :: forall h k clk. (Hard h, KnownNat k, 1 <= k, LiveClock clk) => h clk -> h (k*clk)
-sample = lift1 (makeSignal . Sample)
+sample = pack . map (makeSignal . Sample) . unpack
 
 reg :: forall h k clk. (Hard h, KnownNat k, 1 <= k, LiveClock clk) => h 0 -> h (k*clk) -> h clk
-reg = lift2 (\x y -> makeSignal $ Reg x y)
+reg a b = pack $ zipWith (\x y -> makeSignal $ Reg x y) (unpack a) (unpack b)
 
 delay :: forall h clk. (Hard h, LiveClock clk) => h 0 -> h clk -> h clk
 delay i n = reg @_ @1 i n

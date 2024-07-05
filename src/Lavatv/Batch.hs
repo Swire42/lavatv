@@ -112,7 +112,7 @@ shift ini x = wrap $ delay ini $ lazyUnwrap x
 -- ini[i] is used iff i%n == 0
 -- Tip: ini can typically be `replicate cst`
 shiftReset :: forall n a clk. (KnownNat n, 1 <= n, Hard a, LiveClock clk) => Batch n a clk -> Batch n a clk -> Batch n a clk
-shiftReset ini x = pulseMux @0 ini $ shift (dontCare ()) x
+shiftReset ini x = undefined -- pulseMux @0 ini $ shift (dontCare ()) x
 
 -- Composed short delays, "shifting" values one whole base tick toward the future
 fullDelay :: forall n a clk. (KnownNat n, 1 <= n, Hard a, LiveClock clk) => a 0 -> Batch n a clk -> Batch n a clk

@@ -23,13 +23,14 @@ import Lavatv.Nat
 import qualified Lavatv.Vec as V
 import Lavatv.Core
 
-data BV (width :: Nat) (clk :: Nat) = BV { sig :: Signal clk }
+data BV (width :: Nat) (clk :: Nat) = BV { unBV :: Signal clk }
   deriving Show
 
 instance Hard (BV w) where
-    dontCare = BV . dontCare
-    lift1 f = BV . f . sig
-    lift2 f a b = BV $ f (sig a) (sig b)
+    sigsCount = 1
+    unpack x = [unBV x]
+    pack [x] = BV x
+    pack _ = error "bad size"
 
 type Bit = BV 1
 
@@ -40,13 +41,13 @@ ones :: forall w clk. (KnownNat w, Clock clk) => BV w clk
 ones = BV $ comb (gate { smt2= \V.Nil -> "#b"++replicate (valueOf @w) '1' }) V.Nil
 
 bvnot :: forall w clk. (KnownNat w, Clock clk) => BV w clk -> BV w clk
-bvnot = lift1 $ comb gate { smt2=(V.destruct1 >>> \(x) -> "((_ bvnot "++(show $ valueOf @w)++") "++x++")") } . V.construct1
+bvnot = undefined -- lift1 $ comb gate { smt2=(V.destruct1 >>> \(x) -> "((_ bvnot "++(show $ valueOf @w)++") "++x++")") } . V.construct1
 
 bvand :: forall w clk. (KnownNat w, Clock clk) => BV w clk -> BV w clk -> BV w clk
-bvand = lift2 $ curry $ comb gate { smt2=(V.destruct2 >>> \(x, y) -> "((_ bvand "++(show $ valueOf @w)++") "++x++" "++y++")") } . V.construct2
+bvand = undefined -- lift2 $ curry $ comb gate { smt2=(V.destruct2 >>> \(x, y) -> "((_ bvand "++(show $ valueOf @w)++") "++x++" "++y++")") } . V.construct2
 
 bvxor :: forall w clk. (KnownNat w, Clock clk) => BV w clk -> BV w clk -> BV w clk
-bvxor = lift2 $ curry $ comb gate { smt2=(V.destruct2 >>> \(x, y) -> "((_ bvxor "++(show $ valueOf @w)++") "++x++" "++y++")") } . V.construct2
+bvxor = undefined -- lift2 $ curry $ comb gate { smt2=(V.destruct2 >>> \(x, y) -> "((_ bvxor "++(show $ valueOf @w)++") "++x++" "++y++")") } . V.construct2
 
 bvor :: forall w clk. (KnownNat w, Clock clk) => BV w clk -> BV w clk -> BV w clk
-bvor = lift2 $ curry $ comb gate { smt2=(V.destruct2 >>> \(x, y) -> "((_ bvor "++(show $ valueOf @w)++") "++x++" "++y++")") } . V.construct2
+bvor = undefined -- lift2 $ curry $ comb gate { smt2=(V.destruct2 >>> \(x, y) -> "((_ bvor "++(show $ valueOf @w)++") "++x++" "++y++")") } . V.construct2

@@ -85,6 +85,7 @@ library
         NoStarIsType
         AllowAmbiguousTypes
         ConstraintKinds
+        TypeFamilies
 
     ghc-options:
         -fno-cse

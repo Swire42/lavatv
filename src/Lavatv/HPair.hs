@@ -30,7 +30,6 @@ huncurry :: (a clk -> b clk -> c clk) -> HPair a b clk -> c clk
 huncurry f = uncurry f . unHPair
 
 instance (Hard a, Hard b) => Hard (HPair a b) where
-    dontCare () = HPair (dontCare (), dontCare ())
-    lift1 f x = HPair (lift1 f (hfst x), lift1 f (hsnd x))
-    lift2 f x y = HPair (lift2 f (hfst x) (hfst y), lift2 f (hsnd x) (hsnd y))
-
+    sigsCount = (sigsCount @a) + (sigsCount @b)
+    unpack = undefined
+    pack = undefined
