@@ -20,6 +20,10 @@ newtype HVec (n :: Nat) (h :: Nat -> Type) (clk :: Nat) = HVec { unHVec :: V.Vec
 
 instance (KnownNat n, Hard h) => Hard (HVec n h) where
     sigsCount = (sigsCount @h) * (valueOf @n)
-    unpack = undefined
-    pack = undefined
-
+    unpack (HVec{unHVec=(h `V.Cons` t)}) = unpack h ++ unpack (HVec t)
+    unpack (HVec{unHVec=V.Nil}) = []
+    pack l = ifZero @n (case l of
+        [] -> HVec V.Nil
+        _ -> error "bad size"
+      ) (let (h, t) = splitAt (sigsCount @h) l in
+        HVec (pack h `V.Cons` unHVec (pack t)))

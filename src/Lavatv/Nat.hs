@@ -24,7 +24,7 @@ ifZero a b = case (cmpNat @0 @n Proxy Proxy, cmpNat @1 @n Proxy Proxy) of
   (EQI, GTI) -> a
   (LTI, EQI) -> b
   (LTI, LTI) -> b
-  _ -> undefined
+  _ -> error "unreachable"
 
 ifEq :: forall n m a. (KnownNat n, KnownNat m) => (n ~ m => a) -> a -> a
 ifEq x y = case (cmpNat @n @m Proxy Proxy) of

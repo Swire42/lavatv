@@ -56,32 +56,20 @@ module Lavatv.Vec (
 ) where
 
 import qualified Prelude
-import Prelude (undefined, error, Maybe(..), ($), (.), (<*>), uncurry)
-import GHC.TypeLits
-import Data.Proxy
+import Prelude (error, Maybe(..), ($), (.), (<*>), uncurry)
 import qualified Data.List as L
+
+import Lavatv.Nat
 
 data Vec (n :: Nat) a where
   Nil :: (n ~ 0) => Vec n a
   Cons :: forall n a. (1 <= n) => a -> Vec (n-1) a -> Vec n a
 
-ifZero :: forall n a. KnownNat n => (n ~ 0 => a) -> (1 <= n => a) -> a
-ifZero a b = case (cmpNat @0 @n Proxy Proxy, cmpNat @1 @n Proxy Proxy) of
-  (EQI, GTI) -> a
-  (LTI, EQI) -> b
-  (LTI, LTI) -> b
-  _ -> undefined
-
-ifEq :: forall a b v. (KnownNat a, KnownNat b) => (a ~ b => v) -> v -> v
-ifEq x y = case (cmpNat @a @b Proxy Proxy) of
-  EQI -> x
-  _ -> y
+assertEq :: forall a b v. (KnownNat a, KnownNat b) => (a ~ b => v) -> v
+assertEq x = ifEq @a @b x (error "assert failed")
 
 assertZero :: forall n v. KnownNat n => (n ~ 0 => v) -> v
 assertZero = assertEq @n @0
-
-assertEq :: forall a b v. (KnownNat a, KnownNat b) => (a ~ b => v) -> v
-assertEq x = ifEq @a @b x (error "assert failed")
 
 fromList :: forall n a. KnownNat n => [a] -> Vec n a
 fromList [] = ifZero @n Nil (error "list too small")
@@ -145,7 +133,7 @@ unconcat :: forall n m a. (KnownNat n, KnownNat m) => Vec (n*m) a -> Vec n (Vec 
 unconcat xss = ifZero @n (Nil) (let (x, xs) = split @(n*m) @m xss in x `Cons` unconcat @(n-1) @m xs) 
 
 select :: forall i n a. (KnownNat i, KnownNat n, (i+1) <= n) => Vec n a -> a
-select xs = ifZero @n undefined (let y `Cons` ys = xs in ifZero @i y (select @(i-1) ys))
+select xs = ifZero @n (error "Out-of-bounds") (let y `Cons` ys = xs in ifZero @i y (select @(i-1) ys))
 
 split :: forall n n0 n1 a. (KnownNat n, KnownNat n0, KnownNat n1, n1 ~ (n-n0), n0 <= n) => Vec n a -> (Vec n0 a, Vec n1 a)
 split xss = ifZero @n0 (Nil, xss) ((let x `Cons` xs = xss in let (as, bs) = split @(n-1) @(n0-1) @n1 xs in (x `Cons` as, bs)) :: (1 <= n) => (Vec n0 a, Vec n1 a))

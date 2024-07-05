@@ -14,6 +14,7 @@ module Lavatv.HPair (
 
 import Prelude
 import Data.Kind
+import Control.Arrow ((***))
 
 import Lavatv.Nat
 import Lavatv.Core
@@ -31,5 +32,5 @@ huncurry f = uncurry f . unHPair
 
 instance (Hard a, Hard b) => Hard (HPair a b) where
     sigsCount = (sigsCount @a) + (sigsCount @b)
-    unpack = undefined
-    pack = undefined
+    unpack x = unpack (hfst x) ++ unpack (hsnd x)
+    pack = HPair . (pack *** pack) . splitAt (sigsCount @a)

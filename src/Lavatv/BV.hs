@@ -35,19 +35,19 @@ instance Hard (BV w) where
 type Bit = BV 1
 
 zeros :: forall w clk. (KnownNat w, Clock clk) => BV w clk
-zeros = BV $ comb (gate { smt2= \V.Nil -> "#b"++replicate (valueOf @w) '0' }) V.Nil
+zeros = sigwise0 (gate { smt2=Just (\V.Nil -> "#b"++replicate (valueOf @w) '0')}) ()
 
 ones :: forall w clk. (KnownNat w, Clock clk) => BV w clk
-ones = BV $ comb (gate { smt2= \V.Nil -> "#b"++replicate (valueOf @w) '1' }) V.Nil
+ones = sigwise0 (gate { smt2=Just (\V.Nil -> "#b"++replicate (valueOf @w) '1')}) ()
 
 bvnot :: forall w clk. (KnownNat w, Clock clk) => BV w clk -> BV w clk
-bvnot = undefined -- lift1 $ comb gate { smt2=(V.destruct1 >>> \(x) -> "((_ bvnot "++(show $ valueOf @w)++") "++x++")") } . V.construct1
+bvnot = sigwise1 (gate { smt2=Just (V.destruct1 >>> \(x) -> "((_ bvnot "++(show $ valueOf @w)++") "++x++")") })
 
 bvand :: forall w clk. (KnownNat w, Clock clk) => BV w clk -> BV w clk -> BV w clk
-bvand = undefined -- lift2 $ curry $ comb gate { smt2=(V.destruct2 >>> \(x, y) -> "((_ bvand "++(show $ valueOf @w)++") "++x++" "++y++")") } . V.construct2
+bvand = sigwise2 (gate { smt2=Just (V.destruct2 >>> \(x, y) -> "((_ bvand "++(show $ valueOf @w)++") "++x++" "++y++")") })
 
 bvxor :: forall w clk. (KnownNat w, Clock clk) => BV w clk -> BV w clk -> BV w clk
-bvxor = undefined -- lift2 $ curry $ comb gate { smt2=(V.destruct2 >>> \(x, y) -> "((_ bvxor "++(show $ valueOf @w)++") "++x++" "++y++")") } . V.construct2
+bvxor = sigwise2 (gate { smt2=Just (V.destruct2 >>> \(x, y) -> "((_ bvxor "++(show $ valueOf @w)++") "++x++" "++y++")") })
 
 bvor :: forall w clk. (KnownNat w, Clock clk) => BV w clk -> BV w clk -> BV w clk
-bvor = undefined -- lift2 $ curry $ comb gate { smt2=(V.destruct2 >>> \(x, y) -> "((_ bvor "++(show $ valueOf @w)++") "++x++" "++y++")") } . V.construct2
+bvor = sigwise2 (gate { smt2=Just (V.destruct2 >>> \(x, y) -> "((_ bvor "++(show $ valueOf @w)++") "++x++" "++y++")") })

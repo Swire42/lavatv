@@ -16,6 +16,7 @@ module Lavatv.Core (
 , Lavatv.Core.Hard(..)
 , Lavatv.Core.comb
 , Lavatv.Core.sigwise0
+, Lavatv.Core.dontCare
 , Lavatv.Core.sigwise1
 , Lavatv.Core.sigwise2
 , Lavatv.Core.sample'
@@ -38,10 +39,10 @@ type Vec = V.Vec
 type Clock clk = KnownNat clk
 type LiveClock clk = (KnownNat clk, 1 <= clk)
 
-data Gate (n :: Nat) = Gate { smt2 :: Vec n String -> String, sim :: Vec n Dynamic -> Dynamic }
+data Gate (n :: Nat) = Gate { smt2 :: Maybe (Vec n String -> String), sim :: Maybe (Vec n Dynamic -> Dynamic) }
 
 gate :: Gate _
-gate = Gate { smt2=undefined, sim=undefined }
+gate = Gate { smt2=Nothing, sim=Nothing }
 
 data Signal_ (clk :: Nat) where
     Comb :: forall n clk. (KnownNat n, Clock clk) => Gate n -> Vec n (Signal clk) -> Signal_ clk
@@ -55,7 +56,7 @@ makeSignal :: Signal_ clk -> Signal clk
 makeSignal signal_ = Signal { uniq=makeUniq (), signal=signal_ }
 
 instance Show (Signal clk) where
-    show (Signal { uniq=u, signal=Comb g l }) = show u ++ (smt2 g) (V.map show l)
+    show (Signal { uniq=u, signal=Comb g l }) = show u ++ maybe "???" ($ V.map show l) (smt2 g)
     show (Signal { uniq=u, signal=Sample' x}) = show u ++ show x
     show (Signal { uniq=u, signal=Sample x}) = show u ++ show x
     show (Signal { uniq=u, signal=Reg @k i x}) = show i ++ " -" ++ show u ++ show (valueOf @clk) ++ "> " ++ show x
@@ -76,6 +77,9 @@ comb g ins = makeSignal $ Comb g ins
 
 sigwise0 :: forall h clk. (Hard h, Clock clk) => Gate 0 -> () -> h clk
 sigwise0 g () = pack $ map (\_ -> comb g V.Nil) $ replicate (sigsCount @h) ()
+
+dontCare :: forall h clk. (Hard h, Clock clk) => () -> h clk
+dontCare () = sigwise0 undefined ()
 
 sigwise1 :: forall h1 h2 clk. (Hard h1, Hard h2, Clock clk) => Gate 1 -> h1 clk -> h2 clk
 sigwise1 g = pack . map (comb g . V.construct1) . unpack

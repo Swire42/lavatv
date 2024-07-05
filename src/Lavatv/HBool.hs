@@ -37,19 +37,19 @@ instance Show (HBool clk) where
     show = show . unHBool
 
 htrue :: forall clk. Clock clk => HBool clk
-htrue = sigwise0 (gate { smt2= \V.Nil -> "true" }) ()
+htrue = sigwise0 (gate { smt2=Just (\V.Nil -> "true") }) ()
 
 hfalse :: forall clk. Clock clk => HBool clk
-hfalse = sigwise0 (gate { smt2= \V.Nil -> "false" }) ()
+hfalse = sigwise0 (gate { smt2=Just (\V.Nil -> "false") }) ()
 
 hnot :: forall clk. Clock clk => HBool clk -> HBool clk
-hnot = sigwise1 (gate { smt2=(\(x `V.Cons` V.Nil) -> "(not "++x++")") })
+hnot = sigwise1 (gate { smt2=Just (\(x `V.Cons` V.Nil) -> "(not "++x++")") })
 
 hand :: forall clk. Clock clk => HBool clk -> HBool clk -> HBool clk
-hand = sigwise2 (gate { smt2=(\(x `V.Cons` (y `V.Cons` V.Nil)) -> "(and "++x++" "++y++")") })
+hand = sigwise2 (gate { smt2=Just (\(x `V.Cons` (y `V.Cons` V.Nil)) -> "(and "++x++" "++y++")") })
 
 hor :: forall clk. Clock clk => HBool clk -> HBool clk -> HBool clk
-hor = sigwise2 (gate { smt2=(\(x `V.Cons` (y `V.Cons` V.Nil)) -> "(or "++x++" "++y++")") })
+hor = sigwise2 (gate { smt2=Just (\(x `V.Cons` (y `V.Cons` V.Nil)) -> "(or "++x++" "++y++")") })
 
 pulse :: forall clk. LiveClock clk => () -> HBool clk
 pulse () = x
@@ -59,7 +59,7 @@ ite :: forall h clk. (Hard h, Clock clk) => HBool clk -> (h clk, h clk) -> h clk
 ite cond (a, b) = pack $ map (sigite (unHBool cond)) $ (unpack a `zip` unpack b)
     where
         sigite :: Signal clk -> (Signal clk, Signal clk) -> Signal clk
-        sigite sigc (sigt, sigf) = comb gate { smt2=(V.destruct3 >>> \(c, t, f) -> "(ite "++c++" "++t++" "++f++")") } $ V.construct3 (sigc, sigt, sigf)
+        sigite sigc (sigt, sigf) = comb gate { smt2=Just (V.destruct3 >>> \(c, t, f) -> "(ite "++c++" "++t++" "++f++")") } $ V.construct3 (sigc, sigt, sigf)
 
 ite' :: forall h clk. (Hard h, Clock clk) => HBool clk -> HP.HPair h h clk -> h clk
 ite' cond pair = ite cond (HP.unHPair pair)
