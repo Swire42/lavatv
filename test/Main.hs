@@ -1,4 +1,8 @@
 module Main (main) where
 
+import Lavatv
+import Lavatv.Retime
+import Lavatv.Sim
+
 main :: IO ()
-main = putStrLn "Test suite not yet implemented."
+main = print $ simulate @1 sim1 [1..4000]

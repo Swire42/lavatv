@@ -15,9 +15,6 @@ import Lavatv.Sim
 
 type HVec = HV.HVec
 
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
-
 s0 :: Signal 0
 s0 = comb gate V.Nil
 
@@ -65,6 +62,11 @@ tmap2 (f :: forall a. Bit a -> Bit a) (x :: Bit clk, y :: Bit clk) = (fx :: Bit 
 tmap2b (f :: forall a. Bit a -> Bit a) (xs :: HVec 2 Bit clk) = (fxs :: HVec 2 Bit clk)
   where
     fxs = B.collect (HV.HVec $ V.replicate zeros) $ B.lift f $ B.sweep xs
+
+sim1 :: forall clk. (LiveClock clk) => Sim Int clk -> Sim Int clk
+sim1 y = x
+  where
+    x :: Sim Int clk = (simLift2 (+)) (delay (simLift0 0) x) y
 
 sim3 :: forall clk. (LiveClock clk) => Sim Int clk -> Sim Int clk
 sim3 y = reg @_ @3 (simLift0 0) x

@@ -60,20 +60,20 @@ library
     -- Modules exported by the library.
     exposed-modules:
         Lavatv
+        Lavatv.HBool
+        Lavatv.BV
+        Lavatv.HVec
+        Lavatv.HPair
+        Lavatv.Batch
+        Lavatv.Sim
+        Lavatv.Retime
 
     -- Modules included in this library but not exported.
     other-modules:
         Lavatv.Nat
         Lavatv.Vec
         Lavatv.Core
-        Lavatv.Sim
         Lavatv.Uniq
-        Lavatv.Retime
-        Lavatv.HBool
-        Lavatv.BV
-        Lavatv.HVec
-        Lavatv.HPair
-        Lavatv.Batch
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -126,6 +126,14 @@ test-suite lavatv-test
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
+    default-extensions:
+        GADTs
+        DataKinds
+        PartialTypeSignatures
+        NoStarIsType
+        AllowAmbiguousTypes
+        ConstraintKinds
+        TypeFamilies
 
     -- The interface type and version of the test suite.
     type:             exitcode-stdio-1.0
