@@ -87,7 +87,6 @@ library
         AllowAmbiguousTypes
         ConstraintKinds
         TypeFamilies
-        UndecidableInstances
 
     ghc-options:
         -fno-cse

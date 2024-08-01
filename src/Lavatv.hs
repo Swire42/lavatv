@@ -9,7 +9,6 @@ import qualified Lavatv.Batch as B
 import Lavatv.Core
 import Lavatv.HBool
 import Lavatv.BV
-import Lavatv.Retime
 import Lavatv.Sim
 
 type Vec = V.Vec

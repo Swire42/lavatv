@@ -1,7 +1,6 @@
 module Main (main) where
 
 import Lavatv
-import Lavatv.Retime
 import Lavatv.Sim
 
 main :: IO ()
