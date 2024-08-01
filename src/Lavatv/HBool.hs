@@ -61,4 +61,4 @@ ite :: forall h clk. (UHard h, ClockOf h ~ clk, KnownNat clk) => HBool clk -> (h
 ite cond (a, b) = pack $ map (sigite (unHBool cond)) $ (unpack a `zip` unpack b)
     where
         sigite :: Signal -> (Signal, Signal) -> Signal
-        sigite sigc (sigt, sigf) = comb (valueOf @clk) gate { smt2=Just (V.destruct3 >>> \(c, t, f) -> "(ite "++c++" "++t++" "++f++")") } $ V.construct3 (sigc, sigt, sigf)
+        sigite sigc (sigt, sigf) = sig_comb (valueOf @clk) gate { smt2=Just (V.destruct3 >>> \(c, t, f) -> "(ite "++c++" "++t++" "++f++")") } $ V.construct3 (sigc, sigt, sigf)

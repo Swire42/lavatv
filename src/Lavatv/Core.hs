@@ -14,14 +14,14 @@ module Lavatv.Core (
 , Lavatv.Core.Hard(..)
 , Lavatv.Core.UHard(..)
 , Lavatv.Core.SpedUp
-, Lavatv.Core.comb
+, Lavatv.Core.sig_comb
 , Lavatv.Core.sigwise0
 , Lavatv.Core.sigwise1
 , Lavatv.Core.sigwise2
-, Lavatv.Core.sample'
-, Lavatv.Core.sample
-, Lavatv.Core.reg_
-, Lavatv.Core.delay_
+, Lavatv.Core.sig_sample'
+, Lavatv.Core.sig_sample
+, Lavatv.Core.sig_reg
+, Lavatv.Core.sig_delay
 ) where
 
 import Prelude
@@ -61,27 +61,21 @@ class Hard h where
     unpack :: h -> [Signal]
     pack :: [Signal] -> h
 
-instance Hard Signal where
-    sigsCount = 1
-    unpack x = [x]
-    pack [x] = x
-    pack _ = error "bad size"
-
 class (Hard h) => UHard h where
     type ClockOf h :: Nat
     type ReClock h (c :: Nat) :: Type
 
     cstsample :: forall clk. (KnownPos clk, ClockOf h ~ 0, UHard (ReClock h clk)) => h -> ReClock h clk
-    cstsample = pack . map (sample' (valueOf @clk)) . unpack
+    cstsample = pack . map (sig_sample' (valueOf @clk)) . unpack
 
     upsample :: forall k. (KnownPos k, KnownPos (ClockOf h), UHard (SpedUp h k)) => h -> SpedUp h k
-    upsample = pack . map (sample (valueOf @k)) . unpack
+    upsample = pack . map (sig_sample (valueOf @k)) . unpack
 
     reg :: forall k. (KnownPos k, KnownPos (ClockOf h), UHard (ReClock h 0), UHard (SpedUp h k)) => ReClock h 0 -> SpedUp h k -> h
-    reg ini nxt = pack $ zipWith (\i n -> reg_ i (valueOf @k) n) (unpack ini) (unpack nxt)
+    reg ini nxt = pack $ zipWith (\i n -> sig_reg i (valueOf @k) n) (unpack ini) (unpack nxt)
 
     delay :: (KnownPos (ClockOf h), UHard (ReClock h 0)) => ReClock h 0 -> h -> h
-    delay ini nxt = pack $ zipWith (\i n -> reg_ i 1 n) (unpack ini) (unpack nxt)
+    delay ini nxt = pack $ zipWith (\i n -> sig_reg i 1 n) (unpack ini) (unpack nxt)
 
     dontCare :: KnownNat (ClockOf h) => () -> h
     dontCare = dontCare_ (valueOf @(ClockOf h))
@@ -107,35 +101,34 @@ instance (UHard a, UHard b, ClockOf a ~ ClockOf b) => UHard (a, b) where
     type ClockOf (a, b) = ClockOf a
     type ReClock (a, b) c = (ReClock a c, ReClock b c)
 
-comb :: forall n. KnownNat n => Int -> Gate n -> Vec n Signal -> Signal
-comb clk g ins = assert (V.all ((clk ==) . clock) ins) $ makeSignal clk $ Comb g ins
+sig_comb :: forall n. KnownNat n => Int -> Gate n -> Vec n Signal -> Signal
+sig_comb clk g ins = assert (V.all ((clk ==) . clock) ins) $ makeSignal clk $ Comb g ins
 
 sigwise0 :: forall h. Hard h => Int -> Gate 0 -> () -> h
-sigwise0 clk g () = pack $ map (\_ -> comb clk g V.Nil) $ replicate (sigsCount @h) ()
+sigwise0 clk g () = pack $ map (\_ -> sig_comb clk g V.Nil) $ replicate (sigsCount @h) ()
 
 dontCare_ :: forall h. Hard h => Int -> () -> h
 dontCare_ clk () = sigwise0 clk (gate {smt2=Just (\_ -> "???")}) ()
 
 sigwise1 :: forall h1 h2. (Hard h1, Hard h2) => Int -> Gate 1 -> h1 -> h2
-sigwise1 clk g = pack . map (comb clk g . V.construct1) . unpack
+sigwise1 clk g = pack . map (sig_comb clk g . V.construct1) . unpack
 
 sigwise2 :: forall h1 h2 h3. (Hard h1, Hard h2, Hard h3) => Int -> Gate 2 -> h1 -> h2 -> h3
-sigwise2 clk g a b = pack $ map (comb clk g . V.construct2) $ unpack a `zip` unpack b
+sigwise2 clk g a b = pack $ map (sig_comb clk g . V.construct2) $ unpack a `zip` unpack b
 
-sample' :: forall h. Hard h => Int -> h -> h
-sample' clk = assert (clk > 0) $ pack . map (\sig -> assert (clock sig == 0) $ makeSignal clk $ Sample' clk sig) . unpack
+sig_sample' :: Int -> Signal -> Signal
+sig_sample' clk sig = assert (clk > 0) $ assert (clock sig == 0) $ makeSignal clk $ Sample' clk sig
 
-sample :: forall h. Hard h => Int -> h -> h
-sample k = assert (k > 0) $ pack . map (\sig -> assert (clock sig > 0) $ makeSignal (k * clock sig) $ Sample k sig) . unpack
+sig_sample :: Int -> Signal -> Signal
+sig_sample k sig = assert (k > 0) $ assert (clock sig > 0) $ makeSignal (k * clock sig) $ Sample k sig
 
-reg_ :: forall h. Hard h => h -> Int -> h -> h
-reg_ a k b = assert (k > 0) $ pack $ zipWith (\x y ->
-        assert (clock x == 0) $
-        assert (clock y > 0) $
-        assert ((clock y `mod` k) == 0) $
-        makeSignal (clock y `div` k) $
-        Reg x k y
-    ) (unpack a) (unpack b)
+sig_reg :: Signal -> Int -> Signal -> Signal
+sig_reg ini k nxt = assert (k > 0) $
+            assert (clock ini == 0) $
+            assert (clock nxt > 0) $
+            assert ((clock nxt `mod` k) == 0) $
+            makeSignal (clock nxt `div` k) $
+            Reg ini k nxt
 
-delay_ :: forall h. Hard h => h -> h -> h
-delay_ i n = reg_ i 1 n
+sig_delay :: Signal -> Signal -> Signal
+sig_delay i n = sig_reg i 1 n

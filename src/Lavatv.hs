@@ -14,22 +14,22 @@ import Lavatv.Sim
 type Vec = V.Vec
 
 s0 :: Signal
-s0 = comb 0 gate V.Nil
+s0 = sig_comb 0 gate V.Nil
 
 s1 :: Signal
-s1 = sample' 1 s0
+s1 = sig_sample' 1 s0
 
 s6 :: Signal
-s6 = sample 6 s1
+s6 = sig_sample 6 s1
 
 s3 :: Signal
-s3 = reg_ s0 2 s6
+s3 = sig_reg s0 2 s6
 
 s42 :: Signal -> Signal
-s42 x = sample 2 x
+s42 x = sig_sample 2 x
 
 s2 :: Signal -> Signal
-s2 x = sample 2 x
+s2 x = sig_sample 2 x
 
 
 

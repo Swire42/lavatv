@@ -40,7 +40,7 @@ dynUnroll f inp = limit inp $ map pack $ transpose $ map (rmapFinal `get`) (unpa
                 Sample _ x -> aux rmap1 x
                 Reg _ _ x -> aux rmap1 x
             ret = case signal s of
-                Comb g l -> map (comb 0 g) $ V.transposeVL $ V.map (rmap2 `get`) l
+                Comb g l -> map (sig_comb 0 g) $ V.transposeVL $ V.map (rmap2 `get`) l
                 Sample' _ x -> repeat x
                 Sample k x -> concatMap (replicate k) (rmap2 `get` x)
                 Reg i k x -> i : lastN k (rmap2 `get` x)
