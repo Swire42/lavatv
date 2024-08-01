@@ -62,11 +62,11 @@ library
         Lavatv
         Lavatv.HBool
         Lavatv.BV
-        Lavatv.HVec
-        Lavatv.HPair
-        Lavatv.Batch
         Lavatv.Sim
         Lavatv.Retime
+        Lavatv.Batch
+        --Lavatv.HVec
+        --Lavatv.HPair
 
     -- Modules included in this library but not exported.
     other-modules:
@@ -87,6 +87,7 @@ library
         AllowAmbiguousTypes
         ConstraintKinds
         TypeFamilies
+        UndecidableInstances
 
     ghc-options:
         -fno-cse

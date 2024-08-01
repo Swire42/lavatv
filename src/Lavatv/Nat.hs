@@ -6,15 +6,18 @@ License     : MIT
 -}
 
 module Lavatv.Nat (
-  module GHC.TypeLits,
-  Lavatv.Nat.valueOf,
-  Lavatv.Nat.ifZero,
-  Lavatv.Nat.ifEq,
+  module GHC.TypeLits
+, Lavatv.Nat.KnownPos
+, Lavatv.Nat.valueOf
+, Lavatv.Nat.ifZero
+, Lavatv.Nat.ifEq
 ) where
 
 import Prelude
 import GHC.TypeLits
 import Data.Proxy
+
+type KnownPos n = (KnownNat n, 1 <= n)
 
 valueOf :: forall n. KnownNat n => Int
 valueOf = fromInteger $ natVal @n Proxy

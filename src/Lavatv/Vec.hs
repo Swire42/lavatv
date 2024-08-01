@@ -50,13 +50,17 @@ module Lavatv.Vec (
   Lavatv.Vec.foldl1,
   Lavatv.Vec.scanr,
   Lavatv.Vec.scanl,
+  Lavatv.Vec.and,
+  Lavatv.Vec.or,
+  Lavatv.Vec.any,
+  Lavatv.Vec.all,
   Lavatv.Vec.transposeVV,
   Lavatv.Vec.transposeLV,
   Lavatv.Vec.transposeVL,
 ) where
 
 import qualified Prelude
-import Prelude (error, Maybe(..), ($), (.), (<*>), uncurry)
+import Prelude (error, Bool(..), (&&), (||), Maybe(..), ($), (.), (<*>), uncurry)
 import qualified Data.List as L
 
 import Lavatv.Nat
@@ -203,6 +207,18 @@ scanr f e = reverse . scanl (\b a -> f a b) e . reverse
 
 scanl :: forall n a b. KnownNat n => (b -> a -> b) -> b -> Vec n a -> Vec n b
 scanl f e xss = ifZero @n Nil (let x `Cons` xs = xss in let y = (e `f` x) in y `Cons` scanl f y xs)
+
+and :: forall n. KnownNat n => Vec n Bool -> Bool
+and = foldl (&&) True
+
+or :: forall n. KnownNat n => Vec n Bool -> Bool
+or = foldl (||) False
+
+any :: forall n a. KnownNat n => (a -> Bool) -> Vec n a -> Bool
+any f = or . map f
+
+all :: forall n a. KnownNat n => (a -> Bool) -> Vec n a -> Bool
+all f = and . map f
 
 transposeVV :: forall m n a. (KnownNat n, KnownNat m) => Vec m (Vec n a) -> Vec n (Vec m a)
 transposeVV x = ifZero @n Nil (let (y, ys) = unzip . map (uncons) $ x in y `Cons` transposeVV ys)

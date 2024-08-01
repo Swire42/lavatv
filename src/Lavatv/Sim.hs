@@ -27,28 +27,32 @@ import Lavatv.Retime
 import Data.IntMap.Lazy (IntMap)
 import qualified Data.IntMap.Lazy as IntMap
 
-data Sim a (clk :: Nat) = Sim { unSim :: Signal clk }
+data Sim a (clk :: Nat) = Sim { unSim :: Signal }
 
-instance Hard (Sim a) where
+instance Hard (Sim a clk) where
     sigsCount = 1
     unpack x = [unSim x]
     pack [x] = Sim x
     pack _ = error "bad size"
 
+instance UHard (Sim a clk) where
+    type ClockOf (Sim a clk) = clk
+    type ReClock (Sim a clk) c = Sim a c
+
 simLift0 :: Typeable a => a -> Sim a 0
-simLift0 x = sigwise0 (gate { sim=Just (\_ -> toDyn x)}) ()
+simLift0 x = sigwise0 0 (gate { sim=Just (\_ -> toDyn x)}) ()
 
 simEval :: Typeable a => Sim a 0 -> a
 simEval (Sim { unSim=si }) = fromDyn (eval' si) (error "bad type")
   where
-    eval' :: Signal 0 -> Dynamic
+    eval' :: Signal -> Dynamic
     eval' (Signal { signal=Comb (Gate { sim=s }) v }) = maybe (error "no semantic") ($ V.map eval' v) s
     eval' _ = error "unreachable"
 
 bulkSimEval :: Typeable a => [Sim a 0] -> [a]
 bulkSimEval l = ret
   where
-    eval' :: IntMap Dynamic -> Signal 0 -> IntMap Dynamic
+    eval' :: IntMap Dynamic -> Signal -> IntMap Dynamic
     eval' rmap (Signal { uniq=u, signal=Comb (Gate { sim=s }) v }) =
         if IntMap.member (uniqVal u) rmap then rmap else
         let
@@ -58,18 +62,18 @@ bulkSimEval l = ret
         in rmap2
     eval' _ _ = error "unreachable"
 
-    get :: forall a clk. IntMap a -> Signal clk -> a
+    get :: forall a. IntMap a -> Signal -> a
     get rmap s = rmap IntMap.! (uniqVal $ uniq s)
 
     rmapFinal = foldl (\acc x -> eval' acc (unSim x)) IntMap.empty l
 
     ret :: [_] = map (\x -> fromDyn (rmapFinal `get` (unSim x)) (error "bad type")) l
 
-simLift1 :: forall a b clk. (Typeable a, Typeable b, Clock clk) => (a -> b) -> (Sim a clk -> Sim b clk)
-simLift1 f = sigwise1 (gate { sim=Just (\(x `V.Cons` V.Nil) -> toDyn $ f $ fromDyn x (error "bad type"))})
+simLift1 :: forall a b clk. (Typeable a, Typeable b, KnownNat clk) => (a -> b) -> (Sim a clk -> Sim b clk)
+simLift1 f = sigwise1 (valueOf @clk) (gate { sim=Just (\(x `V.Cons` V.Nil) -> toDyn $ f $ fromDyn x (error "bad type"))})
 
-simLift2 :: forall a b c clk. (Typeable a, Typeable b, Typeable c, Clock clk) => (a -> b -> c) -> (Sim a clk -> Sim b clk -> Sim c clk)
-simLift2 f = sigwise2 (gate { sim=Just (\(x `V.Cons` (y `V.Cons` V.Nil)) -> toDyn $ f (fromDyn x (error "bad type")) (fromDyn y (error "bad type")))})
+simLift2 :: forall a b c clk. (Typeable a, Typeable b, Typeable c, KnownNat clk) => (a -> b -> c) -> (Sim a clk -> Sim b clk -> Sim c clk)
+simLift2 f = sigwise2 (valueOf @clk) (gate { sim=Just (\(x `V.Cons` (y `V.Cons` V.Nil)) -> toDyn $ f (fromDyn x (error "bad type")) (fromDyn y (error "bad type")))})
 
-simulate :: forall clk a b. (LiveClock clk, Typeable a, Typeable b) => (Sim a clk -> Sim b clk) -> [a] -> [b]
+simulate :: forall clk a b. (KnownPos clk, Typeable a, Typeable b) => (Sim a clk -> Sim b clk) -> [a] -> [b]
 simulate circ inp = bulkSimEval (dynUnroll circ (map simLift0 inp))

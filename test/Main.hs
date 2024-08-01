@@ -5,4 +5,4 @@ import Lavatv.Retime
 import Lavatv.Sim
 
 main :: IO ()
-main = print $ simulate @1 sim1 [1..4000]
+main = print $ simulate @1 sim1 [1..1000]
