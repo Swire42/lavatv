@@ -65,13 +65,12 @@ library
         Lavatv.Sim
         Lavatv.Retime
         Lavatv.Batch
-        --Lavatv.HVec
+        Lavatv.Vec
         --Lavatv.HPair
 
     -- Modules included in this library but not exported.
     other-modules:
         Lavatv.Nat
-        Lavatv.Vec
         Lavatv.Core
         Lavatv.Uniq
 
@@ -87,6 +86,7 @@ library
         AllowAmbiguousTypes
         ConstraintKinds
         TypeFamilies
+        BlockArguments
 
     ghc-options:
         -fno-cse

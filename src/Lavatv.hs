@@ -14,7 +14,7 @@ import Lavatv.Sim
 type Vec = V.Vec
 
 s0 :: Signal
-s0 = sig_comb 0 gate V.Nil
+s0 = sig_comb 0 (gate "s0") V.Nil
 
 s1 :: Signal
 s1 = sig_sample' 1 s0

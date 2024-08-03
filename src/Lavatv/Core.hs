@@ -8,6 +8,14 @@ License     : MIT
 module Lavatv.Core (
   Lavatv.Core.Gate(..)
 , Lavatv.Core.gate
+, Lavatv.Core.gateFun0
+, Lavatv.Core.gateFun1
+, Lavatv.Core.gateFun2
+, Lavatv.Core.gateFun3
+, Lavatv.Core.gateSim0
+, Lavatv.Core.gateSim1
+, Lavatv.Core.gateSim2
+, Lavatv.Core.gateSim3
 , Lavatv.Core.Signal_(..)
 , Lavatv.Core.Signal(..)
 , Lavatv.Core.makeSignal
@@ -28,6 +36,7 @@ import Prelude
 import Data.Kind
 import Data.Dynamic
 import Control.Exception
+import Control.Arrow ((>>>))
 
 import Lavatv.Nat
 import Lavatv.Uniq
@@ -35,10 +44,34 @@ import qualified Lavatv.Vec as V
 
 type Vec = V.Vec
 
-data Gate (n :: Nat) = Gate { smt2 :: Maybe (Vec n String -> String), sim :: Maybe (Vec n Dynamic -> Dynamic) }
+data Gate (n :: Nat) = Gate { name :: String, smt2 :: Maybe (Vec n String -> String), sim :: Maybe (Vec n Dynamic -> Dynamic) }
 
-gate :: Gate _
-gate = Gate { smt2=Nothing, sim=Nothing }
+gate :: String -> Gate _
+gate name = Gate { name=name, smt2=Nothing, sim=Nothing }
+
+gateFun0 :: (() -> a) -> Maybe (Vec 0 a -> a)
+gateFun0 f = Just $ \_ -> f ()
+
+gateFun1 :: (a -> a) -> Maybe (Vec 1 a -> a)
+gateFun1 f = Just $ V.destruct1 >>> \x -> f x
+
+gateFun2 :: (a -> a -> a) -> Maybe (Vec 2 a -> a)
+gateFun2 f = Just $ V.destruct2 >>> \(x, y) -> f x y
+
+gateFun3 :: (a -> a -> a -> a) -> Maybe (Vec 3 a -> a)
+gateFun3 f = Just $ V.destruct3 >>> \(x, y, z) -> f x y z
+
+gateSim0 :: Typeable a => (() -> a) -> Maybe (Vec 0 Dynamic -> Dynamic)
+gateSim0 f = Just $ \_ -> toDyn $ f ()
+
+gateSim1 :: (Typeable a, Typeable b) => (a -> b) -> Maybe (Vec 1 Dynamic -> Dynamic)
+gateSim1 f = Just $ V.destruct1 >>> \x -> toDyn $ f (fromDyn x (error "bad type"))
+
+gateSim2 :: (Typeable a, Typeable b, Typeable c) => (a -> b -> c) -> Maybe (Vec 2 Dynamic -> Dynamic)
+gateSim2 f = Just $ V.destruct2 >>> \(x, y) -> toDyn $ f (fromDyn x (error "bad type")) (fromDyn y (error "bad type"))
+
+gateSim3 :: (Typeable a, Typeable b, Typeable c, Typeable d) => (a -> b -> c -> d) -> Maybe (Vec 3 Dynamic -> Dynamic)
+gateSim3 f = Just $ V.destruct3 >>> \(x, y, z) -> toDyn $ f (fromDyn x (error "bad type")) (fromDyn y (error "bad type")) (fromDyn z (error "bad type"))
 
 data Signal_ = forall n. KnownNat n => Comb (Gate n) (Vec n Signal)
              | Sample' Int Signal
@@ -108,7 +141,7 @@ sigwise0 :: forall h. Hard h => Int -> Gate 0 -> () -> h
 sigwise0 clk g () = pack $ map (\_ -> sig_comb clk g V.Nil) $ replicate (sigsCount @h) ()
 
 dontCare_ :: forall h. Hard h => Int -> () -> h
-dontCare_ clk () = sigwise0 clk (gate {smt2=Just (\_ -> "???")}) ()
+dontCare_ clk () = sigwise0 clk ((gate "dontcare") {smt2=Just (\_ -> "???")}) ()
 
 sigwise1 :: forall h1 h2. (Hard h1, Hard h2) => Int -> Gate 1 -> h1 -> h2
 sigwise1 clk g = pack . map (sig_comb clk g . V.construct1) . unpack

@@ -17,7 +17,7 @@ module Lavatv.HBool (
 ) where
 
 import Prelude
-import Control.Arrow ((>>>))
+import Data.Dynamic
 
 import Lavatv.Nat
 import qualified Lavatv.Vec as V
@@ -39,19 +39,34 @@ instance Show (HBool clk) where
     show = show . unHBool
 
 htrue :: forall clk. KnownNat clk => HBool clk
-htrue = sigwise0 (valueOf @clk) (gate { smt2=Just (\V.Nil -> "true") }) ()
+htrue = sigwise0 (valueOf @clk) ((gate "htrue") {
+      smt2=(gateFun0 \() -> "true")
+    , sim=(gateSim0 \() -> True)
+    }) ()
 
 hfalse :: forall clk. KnownNat clk => HBool clk
-hfalse = sigwise0 (valueOf @clk) (gate { smt2=Just (\V.Nil -> "false") }) ()
+hfalse = sigwise0 (valueOf @clk) ((gate "hfalse") {
+      smt2=(gateFun0 \() -> "false")
+    , sim=(gateSim0 \() -> False)
+    }) ()
 
 hnot :: forall clk. KnownNat clk => HBool clk -> HBool clk
-hnot = sigwise1 (valueOf @clk) (gate { smt2=Just (\(x `V.Cons` V.Nil) -> "(not "++x++")") })
+hnot = sigwise1 (valueOf @clk) ((gate "hnot") {
+      smt2=(gateFun1 \x -> "(not "++x++")")
+    , sim=gateSim1 not
+    })
 
 hand :: forall clk. KnownNat clk => HBool clk -> HBool clk -> HBool clk
-hand = sigwise2 (valueOf @clk) (gate { smt2=Just (\(x `V.Cons` (y `V.Cons` V.Nil)) -> "(and "++x++" "++y++")") })
+hand = sigwise2 (valueOf @clk) ((gate "hand") {
+      smt2=(gateFun2 \x y -> "(and "++x++" "++y++")")
+    , sim=gateSim2 (&&)
+    })
 
 hor :: forall clk. KnownNat clk => HBool clk -> HBool clk -> HBool clk
-hor = sigwise2 (valueOf @clk) (gate { smt2=Just (\(x `V.Cons` (y `V.Cons` V.Nil)) -> "(or "++x++" "++y++")") })
+hor = sigwise2 (valueOf @clk) ((gate "hor") {
+      smt2=(gateFun2 \x y -> "(or "++x++" "++y++")")
+    , sim=gateSim2 (||)
+    })
 
 pulse :: forall clk. KnownPos clk => () -> HBool clk
 pulse () = x
@@ -61,4 +76,7 @@ ite :: forall h clk. (UHard h, ClockOf h ~ clk, KnownNat clk) => HBool clk -> (h
 ite cond (a, b) = pack $ map (sigite (unHBool cond)) $ (unpack a `zip` unpack b)
     where
         sigite :: Signal -> (Signal, Signal) -> Signal
-        sigite sigc (sigt, sigf) = sig_comb (valueOf @clk) gate { smt2=Just (V.destruct3 >>> \(c, t, f) -> "(ite "++c++" "++t++" "++f++")") } $ V.construct3 (sigc, sigt, sigf)
+        sigite sigc (sigt, sigf) = sig_comb (valueOf @clk) (gate "ite") {
+              smt2=(gateFun3 \c t f -> "(ite "++c++" "++t++" "++f++")")
+            , sim=(gateFun3 \c t f -> if (fromDyn c (error "bad type")) then t else f)
+            } $ V.construct3 (sigc, sigt, sigf)
