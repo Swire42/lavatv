@@ -6,7 +6,7 @@ License     : MIT
 -}
 
 module Lavatv.Batch (
-  Lavatv.Batch.Batch(unBatch),
+  Lavatv.Batch.Batch(..),
   Lavatv.Batch.wrap,
   Lavatv.Batch.lazyUnwrap,
 
