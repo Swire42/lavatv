@@ -78,7 +78,7 @@ gateSim3 f = Just $ V.destruct3 >>> \(x, y, z) -> toDyn $ f (fromDyn x (error "b
 
 data SigComb = forall n. KnownNat n => GateOp (Gate n) (Vec n Signal)
              | DontCare
-             | Symbolic
+             | Symbolic String
 
 data Signal_ = Comb SigComb
              | CstSample Int Signal
@@ -114,7 +114,7 @@ class (Hard h) => UHard h where
     dontCare :: KnownNat (ClockOf h) => () -> h
     dontCare = sigwiseDontCare (valueOf @(ClockOf h))
 
-    symbolic :: KnownNat (ClockOf h) => () -> h
+    symbolic :: KnownNat (ClockOf h) => String -> h
     symbolic = sigwiseSymbolic (valueOf @(ClockOf h))
 
 type SpedUp h (k :: Nat) = ReClock h (k * ClockOf h)
@@ -147,8 +147,8 @@ sigwise0 clk g () = pack $ map (\_ -> sig_comb clk g V.Nil) $ replicate (sigsCou
 sigwiseDontCare :: forall h. Hard h => Int -> () -> h
 sigwiseDontCare clk () = pack $ map (\() -> makeSignal clk (Comb DontCare)) $ replicate (sigsCount @h) ()
 
-sigwiseSymbolic :: forall h. Hard h => Int -> () -> h
-sigwiseSymbolic clk () = pack $ map (\() -> makeSignal clk (Comb Symbolic)) $ replicate (sigsCount @h) ()
+sigwiseSymbolic :: forall h. Hard h => Int -> String -> h
+sigwiseSymbolic clk name = pack $ map (\n -> makeSignal clk (Comb (Symbolic (name++"_"++show n)))) $ [0..(sigsCount @h)-1]
 
 sigwise1 :: forall h1 h2. (Hard h1, Hard h2) => Int -> Gate 1 -> h1 -> h2
 sigwise1 clk g = pack . map (sig_comb clk g . V.construct1) . unpack
