@@ -41,12 +41,12 @@ lastN n = everyN n . drop (n-1)
 
 lazyList :: Int -> [a] -> [a]
 lazyList 0 _       = []
-lazyList n ~(x:xs) = x : lazyList (n-1) xs
+lazyList n l = head l : lazyList (n-1) (tail l)
 
 dynUnroll :: forall a b. (UHard a, UHard b, KnownPos (ClockOf a), ClockOf a ~ ClockOf b, UHard (ReClock a 0), UHard (ReClock b 0)) => (a -> b) -> [ReClock a 0] -> [ReClock b 0]
 dynUnroll f inp = limit inp $ map pack $ transpose $ map (rmapFinal `mGet`) (unpack out)
   where
-    symb = sigwise0 (valueOf @(ClockOf a)) (gate "symb") ()
+    symb = symbolic ()
     out = f symb
     rmapInit = IntMap.fromList $ map (uniqVal . uniq) (unpack symb) `zip` transpose (map unpack inp)
     rmapFinal = foldl aux rmapInit (unpack out)
@@ -54,12 +54,16 @@ dynUnroll f inp = limit inp $ map pack $ transpose $ map (rmapFinal `mGet`) (unp
     aux :: IntMap [Signal] -> Signal -> IntMap [Signal]
     aux = memo \rmap s -> let
             rmap2 = case signal s of
-                Comb _ l -> V.foldl aux rmap l
+                Comb (GateOp _ l) -> V.foldl aux rmap l
+                Comb DontCare -> rmap
+                Comb Symbolic -> error "unreachable"
                 CstSample _ _ -> rmap
                 UpSample _ x -> aux rmap x
                 Reg _ _ x -> aux rmap x
             ret = case signal s of
-                Comb g l -> map (sig_comb 0 g) $ V.transposeVL $ V.map (rmap2 `mGet`) l
+                Comb (GateOp g l) -> map (sig_comb 0 g) $ V.transposeVL $ V.map (rmap2 `mGet`) l
+                Comb DontCare -> map (\() -> makeSignal 0 (Comb DontCare)) $ repeat ()
+                Comb Symbolic -> error "unreachable"
                 CstSample _ x -> repeat x
                 UpSample k x -> concatMap (replicate k) (rmap2 `mGet` x)
                 Reg i k x -> i : lastN k (rmap2 `mGet` x)
@@ -73,7 +77,7 @@ dynUnroll f inp = limit inp $ map pack $ transpose $ map (rmapFinal `mGet`) (unp
 unroll :: forall n a b. (KnownPos n, UHard a, UHard b, KnownPos (ClockOf a), ClockOf a ~ ClockOf b) => (a -> b) -> (Vec n a -> Vec n b)
 unroll f inp = V.map pack $ V.transposeLV $ map (V.fromList . (rmapFinal `mGet`)) (unpack out)
   where
-    symb = sigwise0 (valueOf @(ClockOf a)) (gate "symb") ()
+    symb = symbolic ()
     out = f symb
     rmapInit = IntMap.fromList $ map (uniqVal . uniq) (unpack symb) `zip` transpose (map unpack (V.toList inp))
     rmapFinal = foldl (aux (valueOf @(ClockOf a)) (valueOf @n)) rmapInit (unpack out)
@@ -81,12 +85,16 @@ unroll f inp = V.map pack $ V.transposeLV $ map (V.fromList . (rmapFinal `mGet`)
     aux :: Int -> Int -> IntMap [Signal] -> Signal -> IntMap [Signal]
     aux clk len = memo \rmap s -> let
             rmap2 = case signal s of
-                Comb _ l -> V.foldl (aux clk len) rmap l
+                Comb (GateOp _ l) -> V.foldl (aux clk len) rmap l
+                Comb DontCare -> rmap
+                Comb Symbolic -> error "unreachable"
                 CstSample _ _ -> rmap
                 UpSample k x -> if (len `mod` k /= 0) then error ("cannot unroll with shifting phase ("++show len++"/"++show k++")") else aux clk (len `div` k) rmap x
                 Reg _ k x -> aux clk (len * k) rmap x
             ret = case signal s of
-                Comb g l -> map (sig_comb clk g) $ V.transposeVL $ V.map (rmap2 `mGet`) l
+                Comb (GateOp g l) -> map (sig_comb clk g) $ V.transposeVL $ V.map (rmap2 `mGet`) l
+                Comb DontCare -> map (\() -> makeSignal clk (Comb DontCare)) $ replicate len ()
+                Comb Symbolic -> error "unreachable"
                 CstSample _ x -> replicate len (sig_cstsample clk x)
                 UpSample k x -> concatMap (replicate k) (rmap2 `mGet` x)
                 Reg i k x -> let prev = lastN k (rmap2 `mGet` x) in sig_delay i (last prev) : lazyList (len-1) (init prev)
@@ -97,7 +105,7 @@ slowdown f inp = B.Batch $ pack $ map (rmapFinal `mGet`) (unpack out)
   where
     clk = valueOf @(ClockOf a)
     count = valueOf @n
-    symb = sigwise0 clk (gate "symb") ()
+    symb = symbolic ()
     out = f symb
     rmapInit = IntMap.fromList $ map (uniqVal . uniq) (unpack symb) `zip` unpack (B.unBatch inp)
     rmapFinal = foldl aux rmapInit (unpack out)
@@ -105,15 +113,21 @@ slowdown f inp = B.Batch $ pack $ map (rmapFinal `mGet`) (unpack out)
     aux :: IntMap Signal -> Signal -> IntMap Signal
     aux = memo \rmap s -> let
             rmap2 = case signal s of
-                Comb _ l -> V.foldl aux rmap l
+                Comb (GateOp _ l) -> V.foldl aux rmap l
+                Comb DontCare -> rmap
+                Comb Symbolic -> error "unreachable"
                 CstSample _ _ -> rmap
                 UpSample 1 x -> aux rmap x
+                UpSample _ _ -> error "slowdown requires a unique clock"
                 Reg _ 1 x -> aux rmap x
-                _ -> error "slowdown requires a unique clock"
+                Reg _ _ _ -> error "slowdown requires a unique clock"
             ret = case signal s of
-                Comb g l -> sig_comb clk g $ V.map (rmap2 `mGet`) l
+                Comb (GateOp g l) -> sig_comb clk g $ V.map (rmap2 `mGet`) l
+                Comb DontCare -> s
+                Comb Symbolic -> error "unreachable"
                 CstSample _ _ -> s
                 UpSample 1 x -> rmap2 `mGet` x
+                UpSample _ _ -> error "slowdown requires a unique clock"
                 Reg i 1 x -> iterate (\nxt -> sig_delay i nxt) (rmap2 `mGet` x) !! count
-                _ -> error "slowdown requires a unique clock"
+                Reg _ _ _ -> error "slowdown requires a unique clock"
         in ret

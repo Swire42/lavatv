@@ -16,6 +16,7 @@ module Lavatv.Core (
 , Lavatv.Core.gateSim1
 , Lavatv.Core.gateSim2
 , Lavatv.Core.gateSim3
+, Lavatv.Core.SigComb(..)
 , Lavatv.Core.Signal_(..)
 , Lavatv.Core.Signal(..)
 , Lavatv.Core.makeSignal
@@ -23,6 +24,8 @@ module Lavatv.Core (
 , Lavatv.Core.UHard(..)
 , Lavatv.Core.SpedUp
 , Lavatv.Core.sig_comb
+, Lavatv.Core.sigwiseDontCare
+, Lavatv.Core.sigwiseSymbolic
 , Lavatv.Core.sigwise0
 , Lavatv.Core.sigwise1
 , Lavatv.Core.sigwise2
@@ -73,7 +76,11 @@ gateSim2 f = Just $ V.destruct2 >>> \(x, y) -> toDyn $ f (fromDyn x (error "bad 
 gateSim3 :: (Typeable a, Typeable b, Typeable c, Typeable d) => (a -> b -> c -> d) -> Maybe (Vec 3 Dynamic -> Dynamic)
 gateSim3 f = Just $ V.destruct3 >>> \(x, y, z) -> toDyn $ f (fromDyn x (error "bad type")) (fromDyn y (error "bad type")) (fromDyn z (error "bad type"))
 
-data Signal_ = forall n. KnownNat n => Comb (Gate n) (Vec n Signal)
+data SigComb = forall n. KnownNat n => GateOp (Gate n) (Vec n Signal)
+             | DontCare
+             | Symbolic
+
+data Signal_ = Comb SigComb
              | CstSample Int Signal
              | UpSample Int Signal
              | Reg Signal Int Signal
@@ -82,12 +89,6 @@ data Signal = Signal { uniq :: Uniq, clock :: Int, signal :: Signal_ }
 
 makeSignal :: Int -> Signal_ -> Signal
 makeSignal clock_ signal_ = Signal { uniq=makeUniq (), clock=clock_, signal=signal_ }
-
-instance Show Signal where
-    show (Signal { uniq=u, signal=Comb g l }) = show u ++ maybe "???" ($ V.map show l) (smt2 g)
-    show (Signal { uniq=u, signal=CstSample _ x}) = show u ++ show x
-    show (Signal { uniq=u, signal=UpSample _ x}) = show u ++ show x
-    show (Signal { uniq=u, clock=clk, signal=Reg i _ x}) = show i ++ " -" ++ show u ++ show clk ++ "> " ++ show x
 
 class Hard h where
     sigsCount :: Int
@@ -111,7 +112,10 @@ class (Hard h) => UHard h where
     delay ini nxt = pack $ zipWith (\i n -> sig_reg i 1 n) (unpack ini) (unpack nxt)
 
     dontCare :: KnownNat (ClockOf h) => () -> h
-    dontCare = dontCare_ (valueOf @(ClockOf h))
+    dontCare = sigwiseDontCare (valueOf @(ClockOf h))
+
+    symbolic :: KnownNat (ClockOf h) => () -> h
+    symbolic = sigwiseSymbolic (valueOf @(ClockOf h))
 
 type SpedUp h (k :: Nat) = ReClock h (k * ClockOf h)
 
@@ -135,13 +139,16 @@ instance (UHard a, UHard b, ClockOf a ~ ClockOf b) => UHard (a, b) where
     type ReClock (a, b) c = (ReClock a c, ReClock b c)
 
 sig_comb :: forall n. KnownNat n => Int -> Gate n -> Vec n Signal -> Signal
-sig_comb clk g ins = assert (V.all ((clk ==) . clock) ins) $ makeSignal clk $ Comb g ins
+sig_comb clk g ins = assert (V.all ((clk ==) . clock) ins) $ makeSignal clk $ Comb $ GateOp g ins
 
 sigwise0 :: forall h. Hard h => Int -> Gate 0 -> () -> h
 sigwise0 clk g () = pack $ map (\_ -> sig_comb clk g V.Nil) $ replicate (sigsCount @h) ()
 
-dontCare_ :: forall h. Hard h => Int -> () -> h
-dontCare_ clk () = sigwise0 clk ((gate "dontcare") {smt2=Just (\_ -> "???")}) ()
+sigwiseDontCare :: forall h. Hard h => Int -> () -> h
+sigwiseDontCare clk () = pack $ map (\() -> makeSignal clk (Comb DontCare)) $ replicate (sigsCount @h) ()
+
+sigwiseSymbolic :: forall h. Hard h => Int -> () -> h
+sigwiseSymbolic clk () = pack $ map (\() -> makeSignal clk (Comb Symbolic)) $ replicate (sigsCount @h) ()
 
 sigwise1 :: forall h1 h2. (Hard h1, Hard h2) => Int -> Gate 1 -> h1 -> h2
 sigwise1 clk g = pack . map (sig_comb clk g . V.construct1) . unpack

@@ -22,7 +22,6 @@ import Lavatv.Nat
 import Lavatv.Core
 
 data BV (width :: Nat) (clk :: Nat) = BV { unBV :: Signal }
-  deriving Show
 
 instance Hard (BV w clk) where
     sigsCount = 1

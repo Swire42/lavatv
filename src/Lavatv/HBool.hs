@@ -35,9 +35,6 @@ instance UHard (HBool clk) where
     type ClockOf (HBool clk) = clk
     type ReClock (HBool clk) c = HBool c
 
-instance Show (HBool clk) where
-    show = show . unHBool
-
 htrue :: forall clk. KnownNat clk => HBool clk
 htrue = sigwise0 (valueOf @clk) ((gate "htrue") {
       smt2=(gateFun0 \() -> "true")

@@ -43,20 +43,22 @@ simEval :: Typeable a => Sim a 0 -> a
 simEval (Sim { unSim=si }) = fromDyn (eval' si) (error "bad type")
   where
     eval' :: Signal -> Dynamic
-    eval' (Signal { signal=Comb (Gate { name=name, sim=s }) v }) = maybe (error ("Gate `"++name++"` has no semantic")) ($ V.map eval' v) s
+    eval' (Signal { signal=Comb (GateOp (Gate { name=name, sim=s }) v) }) = maybe (error ("Gate `"++name++"` has no semantic")) ($ V.map eval' v) s
+    eval' (Signal { signal=Comb (DontCare) }) = error "cannot simulate DontCare"
     eval' _ = error "unreachable"
 
 bulkSimEval :: Typeable a => [Sim a 0] -> [a]
 bulkSimEval l = ret
   where
     eval' :: IntMap Dynamic -> Signal -> IntMap Dynamic
-    eval' rmap (Signal { uniq=u, signal=Comb (Gate { name=name, sim=s }) v }) =
+    eval' rmap (Signal { uniq=u, signal=Comb (GateOp (Gate { name=name, sim=s }) v) }) =
         if IntMap.member (uniqVal u) rmap then rmap else
         let
           rmap1 = IntMap.insert (uniqVal u) ret' rmap
           rmap2 = V.foldl eval' rmap1 v
           ret' = maybe (error ("Gate `"++name++"` has no semantic")) ($ V.map (rmap2 `get`) v) s
         in rmap2
+    eval' rmap (Signal { uniq=u, signal=Comb DontCare }) = IntMap.insert (uniqVal u) (error "cannot simulate DontCare") rmap
     eval' _ _ = error "unreachable"
 
     get :: forall a. IntMap a -> Signal -> a
