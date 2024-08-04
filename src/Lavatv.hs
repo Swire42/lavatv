@@ -13,26 +13,6 @@ import Lavatv.Sim
 
 type Vec = V.Vec
 
-s0 :: Signal
-s0 = sig_comb 0 (gate "s0") V.Nil
-
-s1 :: Signal
-s1 = sig_sample' 1 s0
-
-s6 :: Signal
-s6 = sig_sample 6 s1
-
-s3 :: Signal
-s3 = sig_reg s0 2 s6
-
-s42 :: Signal -> Signal
-s42 x = sig_sample 2 x
-
-s2 :: Signal -> Signal
-s2 x = sig_sample 2 x
-
-
-
 halfadd (a :: Bit _, b :: Bit _) = (s :: Bit _, c :: Bit _)
   where
     s = a `bvxor` b

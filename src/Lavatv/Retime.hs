@@ -55,13 +55,13 @@ dynUnroll f inp = limit inp $ map pack $ transpose $ map (rmapFinal `mGet`) (unp
     aux = memo \rmap s -> let
             rmap2 = case signal s of
                 Comb _ l -> V.foldl aux rmap l
-                Sample' _ _ -> rmap
-                Sample _ x -> aux rmap x
+                CstSample _ _ -> rmap
+                UpSample _ x -> aux rmap x
                 Reg _ _ x -> aux rmap x
             ret = case signal s of
                 Comb g l -> map (sig_comb 0 g) $ V.transposeVL $ V.map (rmap2 `mGet`) l
-                Sample' _ x -> repeat x
-                Sample k x -> concatMap (replicate k) (rmap2 `mGet` x)
+                CstSample _ x -> repeat x
+                UpSample k x -> concatMap (replicate k) (rmap2 `mGet` x)
                 Reg i k x -> i : lastN k (rmap2 `mGet` x)
         in ret
 
@@ -82,13 +82,13 @@ unroll f inp = V.map pack $ V.transposeLV $ map (V.fromList . (rmapFinal `mGet`)
     aux clk len = memo \rmap s -> let
             rmap2 = case signal s of
                 Comb _ l -> V.foldl (aux clk len) rmap l
-                Sample' _ _ -> rmap
-                Sample k x -> if (len `mod` k /= 0) then error ("cannot unroll with shifting phase ("++show len++"/"++show k++")") else aux clk (len `div` k) rmap x
+                CstSample _ _ -> rmap
+                UpSample k x -> if (len `mod` k /= 0) then error ("cannot unroll with shifting phase ("++show len++"/"++show k++")") else aux clk (len `div` k) rmap x
                 Reg _ k x -> aux clk (len * k) rmap x
             ret = case signal s of
                 Comb g l -> map (sig_comb clk g) $ V.transposeVL $ V.map (rmap2 `mGet`) l
-                Sample' _ x -> replicate len (sig_sample' clk x)
-                Sample k x -> concatMap (replicate k) (rmap2 `mGet` x)
+                CstSample _ x -> replicate len (sig_cstsample clk x)
+                UpSample k x -> concatMap (replicate k) (rmap2 `mGet` x)
                 Reg i k x -> let prev = lastN k (rmap2 `mGet` x) in sig_delay i (last prev) : lazyList (len-1) (init prev)
         in ret
 
@@ -106,14 +106,14 @@ slowdown f inp = B.Batch $ pack $ map (rmapFinal `mGet`) (unpack out)
     aux = memo \rmap s -> let
             rmap2 = case signal s of
                 Comb _ l -> V.foldl aux rmap l
-                Sample' _ _ -> rmap
-                Sample 1 x -> aux rmap x
+                CstSample _ _ -> rmap
+                UpSample 1 x -> aux rmap x
                 Reg _ 1 x -> aux rmap x
                 _ -> error "slowdown requires a unique clock"
             ret = case signal s of
                 Comb g l -> sig_comb clk g $ V.map (rmap2 `mGet`) l
-                Sample' _ x -> sig_sample' clk x
-                Sample 1 x -> rmap2 `mGet` x
+                CstSample _ _ -> s
+                UpSample 1 x -> rmap2 `mGet` x
                 Reg i 1 x -> iterate (\nxt -> sig_delay i nxt) (rmap2 `mGet` x) !! count
                 _ -> error "slowdown requires a unique clock"
         in ret
