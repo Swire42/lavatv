@@ -18,7 +18,6 @@ import Lavatv.Nat
 import Lavatv.Core
 import Lavatv.Uniq
 import qualified Lavatv.Vec as V
-import qualified Lavatv.Batch as B
 
 import Data.IntMap.Lazy (IntMap)
 import qualified Data.IntMap.Lazy as IntMap
@@ -100,14 +99,13 @@ unroll f inp = V.map pack $ V.transposeLV $ map (V.fromList . (rmapFinal `mGet`)
                 Reg i k x -> let prev = lastN k (rmap2 `mGet` x) in sig_delay i (last prev) : lazyList (len-1) (init prev)
         in ret
 
-slowdown :: forall n a b. (KnownPos n, UHard a, UHard b, KnownPos (ClockOf a), ClockOf a ~ ClockOf b) => (a -> b) -> (B.Batch n a -> B.Batch n b)
-slowdown f inp = B.Batch $ pack $ map (rmapFinal `mGet`) (unpack out)
+slowdown :: forall a b. (UHard a, UHard b, KnownPos (ClockOf a), ClockOf a ~ ClockOf b) => Int -> (a -> b) -> (a -> b)
+slowdown count f inp = pack $ map (rmapFinal `mGet`) (unpack out)
   where
     clk = valueOf @(ClockOf a)
-    count = valueOf @n
     symb = symbolic "slowdown"
     out = f symb
-    rmapInit = IntMap.fromList $ map (uniqVal . uniq) (unpack symb) `zip` unpack (B.unBatch inp)
+    rmapInit = IntMap.fromList $ map (uniqVal . uniq) (unpack symb) `zip` unpack inp
     rmapFinal = foldl aux rmapInit (unpack out)
 
     aux :: IntMap Signal -> Signal -> IntMap Signal

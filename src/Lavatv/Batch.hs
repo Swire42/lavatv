@@ -37,6 +37,7 @@ import Data.Kind
 import Lavatv.Nat
 
 import Lavatv.Core
+import Lavatv.Retime
 import qualified Lavatv.HBool as HB
 import qualified Lavatv.Vec as V
 
@@ -95,15 +96,15 @@ unzip :: forall n a b. KnownPos n => Batch n (a, b) -> (Batch n a, Batch n b)
 unzip = (wrap *** wrap) . unBatch
 
 -- Apply slowed-down circuit
-map :: forall n a b. KnownPos n => (a -> b) -> Batch n a -> Batch n b
-map = error "todo"--slowdown
+map :: forall n a b. (KnownPos n, UHard a, UHard b, KnownPos (ClockOf a), ClockOf a ~ ClockOf b) => (a -> b) -> Batch n a -> Batch n b
+map f x = Batch $ slowdown (valueOf @n) f $ unBatch x
 
 -- Apply circuit without slowing it down
 lift :: forall n a b. KnownPos n => (a -> b) -> Batch n a -> Batch n b
 lift f = wrap . f . unBatch
 
 -- Merge using slowed-down circuit
-zipWith :: (KnownPos n, UHard a, UHard b, UHard c) => (a -> b -> c) -> Batch n a -> Batch n b -> Batch n c
+zipWith :: (KnownPos n, UHard a, UHard b, UHard c, KnownPos (ClockOf a), ClockOf a ~ ClockOf b, ClockOf a ~ ClockOf c) => (a -> b -> c) -> Batch n a -> Batch n b -> Batch n c
 zipWith f xs ys = map (uncurry f) $ zip xs ys
 
 -- Merge using circuit without slowing it down
