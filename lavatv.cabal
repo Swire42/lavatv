@@ -87,6 +87,7 @@ library
         ConstraintKinds
         TypeFamilies
         BlockArguments
+        MonomorphismRestriction
 
     ghc-options:
         -fno-cse
