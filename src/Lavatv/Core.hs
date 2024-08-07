@@ -103,13 +103,13 @@ class (Hard h) => UHard h where
     cstsample = pack . map (sig_cstsample (valueOf @clk)) . unpack
 
     upsample :: forall k. (KnownPos k, KnownPos (ClockOf h), UHard (SpedUp h k)) => h -> SpedUp h k
-    upsample = pack . map (sig_upsample (valueOf @k)) . unpack
+    upsample = pack . map (sig_upsample (valueOf @(k * ClockOf h)) (valueOf @k)) . unpack
 
     reg :: forall k. (KnownPos k, KnownPos (ClockOf h), UHard (ReClock h 0), UHard (SpedUp h k)) => ReClock h 0 -> SpedUp h k -> h
-    reg ini nxt = pack $ zipWith (\i n -> sig_reg i (valueOf @k) n) (unpack ini) (unpack nxt)
+    reg ini nxt = pack $ zipWith (\i n -> sig_reg (valueOf @(ClockOf h)) i (valueOf @k) n) (unpack ini) (unpack nxt)
 
     delay :: (KnownPos (ClockOf h), UHard (ReClock h 0)) => ReClock h 0 -> h -> h
-    delay ini nxt = pack $ zipWith (\i n -> sig_reg i 1 n) (unpack ini) (unpack nxt)
+    delay ini nxt = pack $ zipWith (\i n -> sig_reg (valueOf @(ClockOf h)) i 1 n) (unpack ini) (unpack nxt)
 
     dontCare :: KnownNat (ClockOf h) => () -> h
     dontCare = sigwiseDontCare (valueOf @(ClockOf h))
@@ -157,18 +157,27 @@ sigwise2 :: forall h1 h2 h3. (Hard h1, Hard h2, Hard h3) => Int -> Gate 2 -> h1 
 sigwise2 clk g a b = pack $ map (sig_comb clk g . V.construct2) $ unpack a `zip` unpack b
 
 sig_cstsample :: Int -> Signal -> Signal
-sig_cstsample clk sig = assert (clk > 0) $ assert (clock sig == 0) $ makeSignal clk $ CstSample clk sig
+sig_cstsample clk sig =
+            assert (clk > 0) $
+            makeSignal clk $
+            CstSample clk (assert (clock sig == 0) sig)
 
-sig_upsample :: Int -> Signal -> Signal
-sig_upsample k sig = assert (k > 0) $ assert (clock sig > 0) $ makeSignal (k * clock sig) $ UpSample k sig
+sig_upsample :: Int -> Int -> Signal -> Signal
+sig_upsample clk k sig =
+            assert (clk > 0) $
+            assert (k > 0) $
+            makeSignal clk $
+            UpSample k (assert (k * clock sig == clk) sig)
 
-sig_reg :: Signal -> Int -> Signal -> Signal
-sig_reg ini k nxt = assert (k > 0) $
-            assert (clock ini == 0) $
-            assert (clock nxt > 0) $
-            assert ((clock nxt `mod` k) == 0) $
-            makeSignal (clock nxt `div` k) $
-            Reg ini k nxt
+sig_reg :: Int -> Signal -> Int -> Signal -> Signal
+sig_reg clk ini k nxt =
+            assert (clk > 0) $
+            assert (k > 0) $
+            makeSignal clk $
+            Reg
+                (assert (clock ini == 0) ini)
+                k
+                (assert (k * clk == clock nxt) nxt)
 
-sig_delay :: Signal -> Signal -> Signal
-sig_delay i n = sig_reg i 1 n
+sig_delay :: Int -> Signal -> Signal -> Signal
+sig_delay clk i n = sig_reg clk i 1 n

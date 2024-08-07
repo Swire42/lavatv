@@ -96,7 +96,7 @@ unroll f inp = V.map pack $ V.transposeLV $ map (V.fromList . (rmapFinal `mGet`)
                 Comb (Symbolic _) -> error "unreachable"
                 CstSample _ x -> replicate len (sig_cstsample clk x)
                 UpSample k x -> concatMap (replicate k) (rmap2 `mGet` x)
-                Reg i k x -> let prev = lastN k (rmap2 `mGet` x) in sig_delay i (last prev) : lazyList (len-1) (init prev)
+                Reg i k x -> let prev = lastN k (rmap2 `mGet` x) in sig_delay clk i (last prev) : lazyList (len-1) (init prev)
         in ret
 
 slowdown :: forall a b. (UHard a, UHard b, KnownPos (ClockOf a), ClockOf a ~ ClockOf b) => Int -> (a -> b) -> (a -> b)
@@ -126,6 +126,6 @@ slowdown count f inp = pack $ map (rmapFinal `mGet`) (unpack out)
                 CstSample _ _ -> s
                 UpSample 1 x -> rmap2 `mGet` x
                 UpSample _ _ -> error "slowdown requires a unique clock"
-                Reg i 1 x -> iterate (\nxt -> sig_delay i nxt) (rmap2 `mGet` x) !! count
+                Reg i 1 x -> iterate (\nxt -> sig_delay clk i nxt) (rmap2 `mGet` x) !! count
                 Reg _ _ _ -> error "slowdown requires a unique clock"
         in ret
