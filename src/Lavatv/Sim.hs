@@ -66,7 +66,7 @@ bulkSimEval l = ret
 
     rmapFinal = foldl (\acc x -> eval' acc (unSim x)) IntMap.empty l
 
-    ret :: [_] = map (\x -> fromDyn (rmapFinal `get` (unSim x)) (error "bad type")) l
+    ret = map (\x -> fromDyn (rmapFinal `get` (unSim x)) (error "bad type")) l
 
 simLift0 :: Typeable a => a -> Sim a 0
 simLift0 x = sigwise0 0 ((gate "simLift0") { sim=gateSim0 \() -> x}) ()
