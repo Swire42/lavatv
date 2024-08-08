@@ -60,19 +60,19 @@ library
     -- Modules exported by the library.
     exposed-modules:
         Lavatv
+        Lavatv.Nat
+        Lavatv.Vec
+        Lavatv.Uniq
+        Lavatv.Core
+        Lavatv.Utils
+        Lavatv.Retime
+        Lavatv.Batch
         Lavatv.HBool
         Lavatv.BV
         Lavatv.Sim
-        Lavatv.Retime
-        Lavatv.Batch
-        Lavatv.Vec
-        --Lavatv.HPair
 
     -- Modules included in this library but not exported.
     other-modules:
-        Lavatv.Nat
-        Lavatv.Core
-        Lavatv.Uniq
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -105,6 +105,7 @@ library
     build-depends:
         base ^>=4.17.2.1
       , containers
+      , pretty
       , ghc-typelits-natnormalise
       , ghc-typelits-presburger
       , ghc-typelits-extra
