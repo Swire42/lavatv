@@ -17,7 +17,8 @@ module Lavatv.Core (
 , Lavatv.Core.gateSim2
 , Lavatv.Core.gateSim3
 , Lavatv.Core.SigComb(..)
-, Lavatv.Core.Signal_(..)
+, Lavatv.Core.SigDef(..)
+, Lavatv.Core.SigInfo(..)
 , Lavatv.Core.Signal(..)
 , Lavatv.Core.makeSignal
 , Lavatv.Core.sigId
@@ -25,11 +26,12 @@ module Lavatv.Core (
 , Lavatv.Core.UHard(..)
 , Lavatv.Core.SpedUp
 , Lavatv.Core.sig_comb
-, Lavatv.Core.sigwiseDontCare
-, Lavatv.Core.sigwiseSymbolic
-, Lavatv.Core.sigwise0
-, Lavatv.Core.sigwise1
-, Lavatv.Core.sigwise2
+, Lavatv.Core.sig_comb0
+, Lavatv.Core.sig_comb1
+, Lavatv.Core.sig_comb2
+, Lavatv.Core.sig_comb3
+, Lavatv.Core.sig_dontcare
+, Lavatv.Core.sig_symbolic
 , Lavatv.Core.sig_cstsample
 , Lavatv.Core.sig_upsample
 , Lavatv.Core.sig_reg
@@ -78,19 +80,21 @@ gateSim2 f = Just $ V.destruct2 >>> \(x, y) -> toDyn $ f (fromDyn x (error "bad 
 gateSim3 :: (Typeable a, Typeable b, Typeable c, Typeable d) => (a -> b -> c -> d) -> Maybe (Vec 3 Dynamic -> Dynamic)
 gateSim3 f = Just $ V.destruct3 >>> \(x, y, z) -> toDyn $ f (fromDyn x (error "bad type")) (fromDyn y (error "bad type")) (fromDyn z (error "bad type"))
 
+data SigInfo = SigInfo { sigClock :: Int, sigSmt2Type :: String }
+
 data SigComb = forall n. KnownNat n => GateOp (Gate n) (Vec n Signal)
              | DontCare
              | Symbolic String
 
-data Signal_ = Comb SigComb
+data SigDef = Comb SigComb
              | CstSample Int Signal
              | UpSample Int Signal
              | Reg Signal Int Signal
 
-data Signal = Signal { sigUniq :: Uniq, sigClock :: Int, sigSignal :: Signal_, sigSmt2Type :: String }
+data Signal = Signal { sigUniq :: Uniq, sigInfo :: SigInfo, sigDef :: SigDef }
 
-makeSignal :: Int -> Signal_ -> Signal
-makeSignal clock_ signal_ = Signal { sigUniq=makeUniq (), sigClock=clock_, sigSignal=signal_, sigSmt2Type="TODO" }
+makeSignal :: SigInfo -> SigDef -> Signal
+makeSignal info signal = Signal { sigUniq=makeUniq (), sigInfo=info, sigDef=signal }
 
 sigId :: Signal -> Int
 sigId = uniqVal . sigUniq
@@ -117,10 +121,8 @@ class (Hard h) => UHard h where
     delay ini nxt = pack $ zipWith (\i n -> sig_reg (valueOf @(ClockOf h)) i 1 n) (unpack ini) (unpack nxt)
 
     dontCare :: KnownNat (ClockOf h) => () -> h
-    dontCare = sigwiseDontCare (valueOf @(ClockOf h))
 
     symbolic :: KnownNat (ClockOf h) => String -> h
-    symbolic = sigwiseSymbolic (valueOf @(ClockOf h))
 
 type SpedUp h (k :: Nat) = ReClock h (k * ClockOf h)
 
@@ -134,6 +136,9 @@ instance (KnownNat n, UHard h) => UHard (Vec n h) where
     type ClockOf (Vec n h) = ClockOf h
     type ReClock (Vec n h) c = Vec n (ReClock h c)
 
+    dontCare () = V.map dontCare $ V.replicate ()
+    symbolic name = V.map (\i -> symbolic (name ++ "_" ++ show i)) $ V.fromList [0..(valueOf @n)-1]
+
 instance (Hard a, Hard b) => Hard (a, b) where
     sigsCount = sigsCount @a + sigsCount @b
     unpack (x, y) = unpack x ++ unpack y
@@ -143,46 +148,52 @@ instance (UHard a, UHard b, ClockOf a ~ ClockOf b) => UHard (a, b) where
     type ClockOf (a, b) = ClockOf a
     type ReClock (a, b) c = (ReClock a c, ReClock b c)
 
-sig_comb :: forall n. KnownNat n => Int -> Gate n -> Vec n Signal -> Signal
-sig_comb clk g ins = assert (V.all ((clk ==) . sigClock) ins) $ makeSignal clk $ Comb $ GateOp g ins
+    dontCare () = (dontCare (), dontCare ())
+    symbolic name = (symbolic (name++"_0"), symbolic (name++"_1"))
 
-sigwise0 :: forall h. Hard h => Int -> Gate 0 -> () -> h
-sigwise0 clk g () = pack $ map (\_ -> sig_comb clk g V.Nil) $ replicate (sigsCount @h) ()
+sig_comb :: forall n. KnownNat n => SigInfo -> Gate n -> Vec n Signal -> Signal
+sig_comb info g ins = assert (V.all ((sigClock info ==) . sigClock . sigInfo) ins) $ makeSignal info $ Comb $ GateOp g ins
 
-sigwiseDontCare :: forall h. Hard h => Int -> () -> h
-sigwiseDontCare clk () = pack $ map (\() -> makeSignal clk (Comb DontCare)) $ replicate (sigsCount @h) ()
+sig_comb0 :: SigInfo -> Gate 0 -> () -> Signal
+sig_comb0 info g () = sig_comb info g V.Nil
 
-sigwiseSymbolic :: forall h. Hard h => Int -> String -> h
-sigwiseSymbolic clk name = pack $ map (\n -> makeSignal clk (Comb (Symbolic (name++"_"++show n)))) $ [0..(sigsCount @h)-1]
+sig_comb1 :: SigInfo -> Gate 1 -> Signal -> Signal
+sig_comb1 info g = sig_comb info g . V.construct1
 
-sigwise1 :: forall h1 h2. (Hard h1, Hard h2) => Int -> Gate 1 -> h1 -> h2
-sigwise1 clk g = pack . map (sig_comb clk g . V.construct1) . unpack
+sig_comb2 :: SigInfo -> Gate 2 -> (Signal, Signal) -> Signal
+sig_comb2 info g = sig_comb info g . V.construct2
 
-sigwise2 :: forall h1 h2 h3. (Hard h1, Hard h2, Hard h3) => Int -> Gate 2 -> h1 -> h2 -> h3
-sigwise2 clk g a b = pack $ map (sig_comb clk g . V.construct2) $ unpack a `zip` unpack b
+sig_comb3 :: SigInfo -> Gate 3 -> (Signal, Signal, Signal) -> Signal
+sig_comb3 info g = sig_comb info g . V.construct3
+
+sig_dontcare :: SigInfo -> Signal
+sig_dontcare info = makeSignal info $ Comb $ DontCare
+
+sig_symbolic :: SigInfo -> String -> Signal
+sig_symbolic info name = makeSignal info $ Comb $ Symbolic name
 
 sig_cstsample :: Int -> Signal -> Signal
 sig_cstsample clk sig =
             assert (clk > 0) $
-            makeSignal clk $
-            CstSample clk (assert (sigClock sig == 0) sig)
+            makeSignal ((sigInfo sig) { sigClock=clk }) $
+            CstSample clk (assert (sigClock (sigInfo sig) == 0) sig)
 
 sig_upsample :: Int -> Int -> Signal -> Signal
 sig_upsample clk k sig =
             assert (clk > 0) $
             assert (k > 0) $
-            makeSignal clk $
-            UpSample k (assert (k * sigClock sig == clk) sig)
+            makeSignal ((sigInfo sig) { sigClock=clk }) $
+            UpSample k (assert (k * sigClock (sigInfo sig) == clk) sig)
 
 sig_reg :: Int -> Signal -> Int -> Signal -> Signal
 sig_reg clk ini k nxt =
             assert (clk > 0) $
             assert (k > 0) $
-            makeSignal clk $
+            makeSignal ((sigInfo ini) { sigClock=clk }) $
             Reg
-                (assert (sigClock ini == 0) ini)
+                (assert (sigClock (sigInfo ini) == 0) ini)
                 k
-                (assert (k * clk == sigClock nxt) nxt)
+                (assert (k * clk == sigClock (sigInfo nxt)) nxt)
 
 sig_delay :: Int -> Signal -> Signal -> Signal
 sig_delay clk i n = sig_reg clk i 1 n

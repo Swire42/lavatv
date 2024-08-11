@@ -15,7 +15,6 @@ import Prelude hiding ((<>))
 import Control.Exception
 
 import Lavatv.Core
-import Lavatv.Uniq
 import qualified Lavatv.Vec as V
 
 import Text.PrettyPrint
@@ -36,7 +35,7 @@ sortedNetlist = reverse . snd . snd . global (IntSet.empty, (IntSet.empty, []))
 
     local :: (IntSet, [Signal]) -> Signal -> (IntSet, [Signal])
     local (set, lis) s = if IntSet.member (sigId s) set then (set, lis) else
-        slInsert s $ case sigSignal s of
+        slInsert s $ case sigDef s of
             Comb (GateOp _ l) -> V.foldl local (set, lis) l
             Comb DontCare -> (set, lis)
             Comb (Symbolic _) -> (set, lis)
@@ -49,7 +48,7 @@ sortedNetlist = reverse . snd . snd . global (IntSet.empty, (IntSet.empty, []))
         let set2 = IntSet.insert (sigId s) set in
         let sl2 = local sl s in
         let ss2 = (set2, sl2) in
-        case sigSignal s of
+        case sigDef s of
             Comb (GateOp _ l) -> V.foldl global ss2 l
             Comb DontCare -> ss2
             Comb (Symbolic _) -> ss2
@@ -64,7 +63,7 @@ formatNetlist = vcat . map line
     sig s = text "s" <> (int $ sigId s)
 
     line :: Signal -> Doc
-    line s = sig s <+> text "=" <+> case sigSignal s of
+    line s = sig s <+> text "=" <+> case sigDef s of
         Comb (GateOp g l) -> text (gateName g) <+> hsep (V.toList $ V.map sig l)
         Comb DontCare -> text "DontCare"
         Comb (Symbolic n) -> text ("\"" ++ n ++ "\"")
