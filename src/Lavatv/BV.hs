@@ -8,21 +8,23 @@ License     : MIT
 module Lavatv.BV (
   Lavatv.BV.BV(..)
 , Lavatv.BV.Bit
-, Lavatv.BV.zeros
-, Lavatv.BV.ones
-, Lavatv.BV.bvnot
-, Lavatv.BV.bvand
-, Lavatv.BV.bvxor
-, Lavatv.BV.bvor
+, Lavatv.BV.bvFromInt
+, Lavatv.BV.bvZeros
+, Lavatv.BV.bvOnes
+, Lavatv.BV.bvNot
+, Lavatv.BV.bvAnd
+, Lavatv.BV.bvXor
+, Lavatv.BV.bvOr
 ) where
 
-import Prelude
+import Prelude hiding ((<>))
 import Control.Exception
 import Text.PrettyPrint
-import Text.Printf
+import Data.Bits
 
 import Lavatv.Nat
 import Lavatv.Core
+import qualified Lavatv.Vec as V
 
 data BV (width :: Nat) (clk :: Nat) = BV { unBV :: Signal }
 
@@ -46,22 +48,40 @@ type Bit = BV 1
 
 -- | BV SMT2 litteral
 bvLitt :: Int -> Int -> Doc
-bvLitt w n = assert (2^w > n) $ text $ printf ("#b%0" ++ show w ++ "b") n
+bvLitt width val = assert (2^width > val) $ text $ "#b" ++ [if testBit val k then '1' else '0' | k <- reverse [0..width-1]]
 
-zeros :: forall w clk. (KnownNat w, KnownNat clk) => BV w clk
-zeros = BV $ sig_comb0 (sigInfoBV @w @clk) ((gate "zeros") { gateSmt2=(gateFun0 \() -> bvLitt (valueOf @w) 0)}) ()
+bvFromInt :: forall w clk. (KnownNat w, KnownNat clk) => Int -> BV w clk
+bvFromInt val = assert (2^(valueOf @w) > val) $ BV $ sig_comb0 (sigInfoBV @w @clk) ((gate "bvFromInt") {
+      gateSmt2=(gateFun0 \() -> bvLitt (valueOf @w) val)
+    , gateSim=(gateSim0 \() -> V.fromList @w $ map (testBit val) [0..(valueOf @w)-1])
+    }) ()
 
-ones :: forall w clk. (KnownNat w, KnownNat clk) => BV w clk
-ones = BV $ sig_comb0 (sigInfoBV @w @clk) ((gate "ones") { gateSmt2=(gateFun0 \() -> bvLitt (valueOf @w) (2^(valueOf @w)-1))}) ()
+bvZeros :: forall w clk. (KnownNat w, KnownNat clk) => BV w clk
+bvZeros = bvFromInt 0
 
-bvnot :: forall w clk. (KnownNat w, KnownNat clk) => BV w clk -> BV w clk
-bvnot a = BV $ sig_comb1 (sigInfoBV @w @clk) ((gate "bvnot") { gateSmt2=(gateFun1 \x -> parens $ (parens $ text "_ bvnot" <+> (int $ valueOf @w)) <+> x) }) (unBV a)
+bvOnes :: forall w clk. (KnownNat w, KnownNat clk) => BV w clk
+bvOnes = bvFromInt (2^(valueOf @w)-1)
 
-bvand :: forall w clk. (KnownNat w, KnownNat clk) => BV w clk -> BV w clk -> BV w clk
-bvand a b = BV $ sig_comb2 (sigInfoBV @w @clk) ((gate "bvand") { gateSmt2=(gateFun2 \x y -> parens $ (parens $ text "_ bvand" <+> (int $ valueOf @w)) <+> x <+> y) }) (unBV a, unBV b)
+bvNot :: forall w clk. (KnownNat w, KnownNat clk) => BV w clk -> BV w clk
+bvNot a = BV $ sig_comb1 (sigInfoBV @w @clk) ((gate "bvNot") {
+      gateSmt2=(gateFun1 \x -> parens $ (parens $ text "_ bvnot" <+> (int $ valueOf @w)) <+> x)
+    , gateSim=gateSim1 (V.map @w not)
+    }) (unBV a)
 
-bvxor :: forall w clk. (KnownNat w, KnownNat clk) => BV w clk -> BV w clk -> BV w clk
-bvxor a b = BV $ sig_comb2 (sigInfoBV @w @clk) ((gate "bvxor") { gateSmt2=(gateFun2 \x y -> parens $ (parens $ text "_ bvxor" <+> (int $ valueOf @w)) <+> x <+> y) }) (unBV a, unBV b)
+bvAnd :: forall w clk. (KnownNat w, KnownNat clk) => BV w clk -> BV w clk -> BV w clk
+bvAnd a b = BV $ sig_comb2 (sigInfoBV @w @clk) ((gate "bvAnd") {
+      gateSmt2=(gateFun2 \x y -> parens $ (parens $ text "_ bvand" <+> (int $ valueOf @w)) <+> x <+> y)
+    , gateSim=gateSim2 (V.zipWith @w (&&))
+    }) (unBV a, unBV b)
 
-bvor :: forall w clk. (KnownNat w, KnownNat clk) => BV w clk -> BV w clk -> BV w clk
-bvor a b = BV $ sig_comb2 (sigInfoBV @w @clk) ((gate "bvor") { gateSmt2=(gateFun2 \x y -> parens $ (parens $ text "_ bvor" <+> (int $ valueOf @w)) <+> x <+> y) }) (unBV a, unBV b)
+bvXor :: forall w clk. (KnownNat w, KnownNat clk) => BV w clk -> BV w clk -> BV w clk
+bvXor a b = BV $ sig_comb2 (sigInfoBV @w @clk) ((gate "bvXor") {
+      gateSmt2=(gateFun2 \x y -> parens $ (parens $ text "_ bvxor" <+> (int $ valueOf @w)) <+> x <+> y)
+    , gateSim=gateSim2 (V.zipWith @w @Bool (/=))
+    }) (unBV a, unBV b)
+
+bvOr :: forall w clk. (KnownNat w, KnownNat clk) => BV w clk -> BV w clk -> BV w clk
+bvOr a b = BV $ sig_comb2 (sigInfoBV @w @clk) ((gate "bvOr") {
+      gateSmt2=(gateFun2 \x y -> parens $ (parens $ text "_ bvor" <+> (int $ valueOf @w)) <+> x <+> y)
+    , gateSim=gateSim2 (V.zipWith @w (||))
+    }) (unBV a, unBV b)

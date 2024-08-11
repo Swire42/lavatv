@@ -15,22 +15,22 @@ type Vec = V.Vec
 
 halfadd (a :: Bit _, b :: Bit _) = (s :: Bit _, c :: Bit _)
   where
-    s = a `bvxor` b
-    c = a `bvand` b
+    s = a `bvXor` b
+    c = a `bvAnd` b
 
 fulladd (a :: Bit _, b :: Bit _, ci :: Bit _) = (s :: Bit _, co :: Bit _)
   where
     (t, c1) = halfadd (a, b)
     (s, c2) = halfadd (ci, t)
-    co = c1 `bvor` c2
+    co = c1 `bvOr` c2
 
 serialAdd (a :: Bit _, b :: Bit _) = (s :: Bit _)
   where
-    (s, c) = fulladd (a, b, delay zeros c)
+    (s, c) = fulladd (a, b, delay bvZeros c)
 
 mux (sel :: Bit _) (x0 :: Bit _, x1 :: Bit _) = (x :: Bit _)
   where
-    x = (x0 `bvand` bvnot sel) `bvor` (x1 `bvand` sel)
+    x = (x0 `bvAnd` bvNot sel) `bvOr` (x1 `bvAnd` sel)
 
 tmap2 (f :: forall a. Bit a -> Bit a) (x :: Bit clk, y :: Bit clk) = (fx :: Bit clk, fy :: Bit clk)
   where
@@ -38,12 +38,12 @@ tmap2 (f :: forall a. Bit a -> Bit a) (x :: Bit clk, y :: Bit clk) = (fx :: Bit 
     sy :: Bit (2*clk) = upsample y
     z = ite (pulse ()) (sx, sy)
     fz = f z
-    fx = reg zeros $ delay zeros fz
-    fy = reg zeros fz
+    fx = reg bvZeros $ delay bvZeros fz
+    fy = reg bvZeros fz
 
 tmap2b (f :: forall a. Bit a -> Bit a) (xs :: Vec 2 (Bit clk)) = (fxs :: Vec 2 (Bit clk))
   where
-    fxs = B.collect (V.replicate zeros) $ B.lift f $ B.sweep xs
+    fxs = B.collect (V.replicate bvZeros) $ B.lift f $ B.sweep xs
 
 sim0 :: forall clk. (KnownPos clk) => Sim Int clk -> Sim Int clk
 sim0 _ = cstsample $ simLift0 42
