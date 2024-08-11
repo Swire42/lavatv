@@ -20,6 +20,7 @@ module Lavatv.Core (
 , Lavatv.Core.Signal_(..)
 , Lavatv.Core.Signal(..)
 , Lavatv.Core.makeSignal
+, Lavatv.Core.sigId
 , Lavatv.Core.Hard(..)
 , Lavatv.Core.UHard(..)
 , Lavatv.Core.SpedUp
@@ -40,6 +41,7 @@ import Data.Kind
 import Data.Dynamic
 import Control.Exception
 import Control.Arrow ((>>>))
+import Text.PrettyPrint
 
 import Lavatv.Nat
 import Lavatv.Uniq
@@ -47,10 +49,10 @@ import qualified Lavatv.Vec as V
 
 type Vec = V.Vec
 
-data Gate (n :: Nat) = Gate { name :: String, smt2 :: Maybe (Vec n String -> String), sim :: Maybe (Vec n Dynamic -> Dynamic) }
+data Gate (n :: Nat) = Gate { gateName :: String, gateSmt2 :: Maybe (Vec n Doc -> Doc), gateSim :: Maybe (Vec n Dynamic -> Dynamic) }
 
 gate :: String -> Gate _
-gate name = Gate { name=name, smt2=Nothing, sim=Nothing }
+gate name = Gate { gateName=name, gateSmt2=Nothing, gateSim=Nothing }
 
 gateFun0 :: (() -> a) -> Maybe (Vec 0 a -> a)
 gateFun0 f = Just $ \_ -> f ()
@@ -85,10 +87,13 @@ data Signal_ = Comb SigComb
              | UpSample Int Signal
              | Reg Signal Int Signal
 
-data Signal = Signal { uniq :: Uniq, clock :: Int, signal :: Signal_ }
+data Signal = Signal { sigUniq :: Uniq, sigClock :: Int, sigSignal :: Signal_, sigSmt2Type :: String }
 
 makeSignal :: Int -> Signal_ -> Signal
-makeSignal clock_ signal_ = Signal { uniq=makeUniq (), clock=clock_, signal=signal_ }
+makeSignal clock_ signal_ = Signal { sigUniq=makeUniq (), sigClock=clock_, sigSignal=signal_, sigSmt2Type="TODO" }
+
+sigId :: Signal -> Int
+sigId = uniqVal . sigUniq
 
 class Hard h where
     sigsCount :: Int
@@ -139,7 +144,7 @@ instance (UHard a, UHard b, ClockOf a ~ ClockOf b) => UHard (a, b) where
     type ReClock (a, b) c = (ReClock a c, ReClock b c)
 
 sig_comb :: forall n. KnownNat n => Int -> Gate n -> Vec n Signal -> Signal
-sig_comb clk g ins = assert (V.all ((clk ==) . clock) ins) $ makeSignal clk $ Comb $ GateOp g ins
+sig_comb clk g ins = assert (V.all ((clk ==) . sigClock) ins) $ makeSignal clk $ Comb $ GateOp g ins
 
 sigwise0 :: forall h. Hard h => Int -> Gate 0 -> () -> h
 sigwise0 clk g () = pack $ map (\_ -> sig_comb clk g V.Nil) $ replicate (sigsCount @h) ()
@@ -160,14 +165,14 @@ sig_cstsample :: Int -> Signal -> Signal
 sig_cstsample clk sig =
             assert (clk > 0) $
             makeSignal clk $
-            CstSample clk (assert (clock sig == 0) sig)
+            CstSample clk (assert (sigClock sig == 0) sig)
 
 sig_upsample :: Int -> Int -> Signal -> Signal
 sig_upsample clk k sig =
             assert (clk > 0) $
             assert (k > 0) $
             makeSignal clk $
-            UpSample k (assert (k * clock sig == clk) sig)
+            UpSample k (assert (k * sigClock sig == clk) sig)
 
 sig_reg :: Int -> Signal -> Int -> Signal -> Signal
 sig_reg clk ini k nxt =
@@ -175,9 +180,9 @@ sig_reg clk ini k nxt =
             assert (k > 0) $
             makeSignal clk $
             Reg
-                (assert (clock ini == 0) ini)
+                (assert (sigClock ini == 0) ini)
                 k
-                (assert (k * clk == clock nxt) nxt)
+                (assert (k * clk == sigClock nxt) nxt)
 
 sig_delay :: Int -> Signal -> Signal -> Signal
 sig_delay clk i n = sig_reg clk i 1 n

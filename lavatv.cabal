@@ -66,6 +66,7 @@ library
         Lavatv.Core
         Lavatv.Utils
         Lavatv.Retime
+        Lavatv.Verif
         Lavatv.Batch
         Lavatv.HBool
         Lavatv.BV

@@ -43,39 +43,39 @@ simEval :: Typeable a => Sim a 0 -> a
 simEval (Sim { unSim=si }) = fromDyn (eval' si) (error "bad type")
   where
     eval' :: Signal -> Dynamic
-    eval' (Signal { signal=Comb (GateOp (Gate { name=name, sim=s }) v) }) = maybe (error ("Gate `"++name++"` has no semantic")) ($ V.map eval' v) s
-    eval' (Signal { signal=Comb (DontCare) }) = error "cannot simulate DontCare"
+    eval' (Signal { sigSignal=Comb (GateOp (Gate { gateName=name, gateSim=s }) v) }) = maybe (error ("Gate `"++name++"` has no semantic")) ($ V.map eval' v) s
+    eval' (Signal { sigSignal=Comb (DontCare) }) = error "cannot simulate DontCare"
     eval' _ = error "unreachable"
 
 bulkSimEval :: Typeable a => [Sim a 0] -> [a]
 bulkSimEval l = ret
   where
     eval' :: IntMap Dynamic -> Signal -> IntMap Dynamic
-    eval' rmap (Signal { uniq=u, signal=Comb (GateOp (Gate { name=name, sim=s }) v) }) =
+    eval' rmap (Signal { sigUniq=u, sigSignal=Comb (GateOp (Gate { gateName=name, gateSim=s }) v) }) =
         if IntMap.member (uniqVal u) rmap then rmap else
         let
           rmap1 = IntMap.insert (uniqVal u) ret' rmap
           rmap2 = V.foldl eval' rmap1 v
           ret' = maybe (error ("Gate `"++name++"` has no semantic")) ($ V.map (rmap2 `get`) v) s
         in rmap2
-    eval' rmap (Signal { uniq=u, signal=Comb DontCare }) = IntMap.insert (uniqVal u) (error "cannot simulate DontCare") rmap
+    eval' rmap (Signal { sigUniq=u, sigSignal=Comb DontCare }) = IntMap.insert (uniqVal u) (error "cannot simulate DontCare") rmap
     eval' _ _ = error "unreachable"
 
     get :: forall a. IntMap a -> Signal -> a
-    get rmap s = rmap IntMap.! (uniqVal $ uniq s)
+    get rmap s = rmap IntMap.! (sigId s)
 
     rmapFinal = foldl (\acc x -> eval' acc (unSim x)) IntMap.empty l
 
     ret = map (\x -> fromDyn (rmapFinal `get` (unSim x)) (error "bad type")) l
 
 simLift0 :: Typeable a => a -> Sim a 0
-simLift0 x = sigwise0 0 ((gate "simLift0") { sim=gateSim0 \() -> x}) ()
+simLift0 x = sigwise0 0 ((gate "simLift0") { gateSim=gateSim0 \() -> x}) ()
 
 simLift1 :: forall a b clk. (Typeable a, Typeable b, KnownNat clk) => (a -> b) -> (Sim a clk -> Sim b clk)
-simLift1 f = sigwise1 (valueOf @clk) ((gate "simLift1") { sim=gateSim1 f })
+simLift1 f = sigwise1 (valueOf @clk) ((gate "simLift1") { gateSim=gateSim1 f })
 
 simLift2 :: forall a b c clk. (Typeable a, Typeable b, Typeable c, KnownNat clk) => (a -> b -> c) -> (Sim a clk -> Sim b clk -> Sim c clk)
-simLift2 f = sigwise2 (valueOf @clk) ((gate "simLift2") { sim=gateSim2 f })
+simLift2 f = sigwise2 (valueOf @clk) ((gate "simLift2") { gateSim=gateSim2 f })
 
 simulate :: forall clk a b. (KnownPos clk, Typeable a, Typeable b) => (Sim a clk -> Sim b clk) -> [a] -> [b]
 simulate circ inp = bulkSimEval (dynUnroll circ (map simLift0 inp))

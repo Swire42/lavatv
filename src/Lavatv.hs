@@ -24,6 +24,10 @@ fulladd (a :: Bit _, b :: Bit _, ci :: Bit _) = (s :: Bit _, co :: Bit _)
     (s, c2) = halfadd (ci, t)
     co = c1 `bvor` c2
 
+serialAdd (a :: Bit _, b :: Bit _) = (s :: Bit _)
+  where
+    (s, c) = fulladd (a, b, delay zeros c)
+
 mux (sel :: Bit _) (x0 :: Bit _, x1 :: Bit _) = (x :: Bit _)
   where
     x = (x0 `bvand` bvnot sel) `bvor` (x1 `bvand` sel)

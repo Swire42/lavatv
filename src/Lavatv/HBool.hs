@@ -18,6 +18,7 @@ module Lavatv.HBool (
 
 import Prelude
 import Data.Dynamic
+import Text.PrettyPrint
 
 import Lavatv.Nat
 import qualified Lavatv.Vec as V
@@ -37,32 +38,32 @@ instance UHard (HBool clk) where
 
 htrue :: forall clk. KnownNat clk => HBool clk
 htrue = sigwise0 (valueOf @clk) ((gate "htrue") {
-      smt2=(gateFun0 \() -> "true")
-    , sim=(gateSim0 \() -> True)
+      gateSmt2=(gateFun0 \() -> text "true")
+    , gateSim=(gateSim0 \() -> True)
     }) ()
 
 hfalse :: forall clk. KnownNat clk => HBool clk
 hfalse = sigwise0 (valueOf @clk) ((gate "hfalse") {
-      smt2=(gateFun0 \() -> "false")
-    , sim=(gateSim0 \() -> False)
+      gateSmt2=(gateFun0 \() -> text "false")
+    , gateSim=(gateSim0 \() -> False)
     }) ()
 
 hnot :: forall clk. KnownNat clk => HBool clk -> HBool clk
 hnot = sigwise1 (valueOf @clk) ((gate "hnot") {
-      smt2=(gateFun1 \x -> "(not "++x++")")
-    , sim=gateSim1 not
+      gateSmt2=(gateFun1 \x -> parens $ text "not" <+> x)
+    , gateSim=gateSim1 not
     })
 
 hand :: forall clk. KnownNat clk => HBool clk -> HBool clk -> HBool clk
 hand = sigwise2 (valueOf @clk) ((gate "hand") {
-      smt2=(gateFun2 \x y -> "(and "++x++" "++y++")")
-    , sim=gateSim2 (&&)
+      gateSmt2=(gateFun2 \x y -> parens $ text "and" <+> x <+> y)
+    , gateSim=gateSim2 (&&)
     })
 
 hor :: forall clk. KnownNat clk => HBool clk -> HBool clk -> HBool clk
 hor = sigwise2 (valueOf @clk) ((gate "hor") {
-      smt2=(gateFun2 \x y -> "(or "++x++" "++y++")")
-    , sim=gateSim2 (||)
+      gateSmt2=(gateFun2 \x y -> parens $ text "or" <+> x <+> y)
+    , gateSim=gateSim2 (||)
     })
 
 pulse :: forall clk. KnownPos clk => () -> HBool clk
@@ -74,6 +75,6 @@ ite cond (a, b) = pack $ map (sigite (unHBool cond)) $ (unpack a `zip` unpack b)
     where
         sigite :: Signal -> (Signal, Signal) -> Signal
         sigite sigc (sigt, sigf) = sig_comb (valueOf @clk) (gate "ite") {
-              smt2=(gateFun3 \c t f -> "(ite "++c++" "++t++" "++f++")")
-            , sim=(gateFun3 \c t f -> if (fromDyn c (error "bad type")) then t else f)
+              gateSmt2=(gateFun3 \c t f -> parens $ text "ite" <+> c <+> t <+> f)
+            , gateSim=(gateFun3 \c t f -> if (fromDyn c (error "bad type")) then t else f)
             } $ V.construct3 (sigc, sigt, sigf)
