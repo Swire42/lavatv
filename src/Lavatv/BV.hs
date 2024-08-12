@@ -15,6 +15,10 @@ module Lavatv.BV (
 , Lavatv.BV.bvAnd
 , Lavatv.BV.bvXor
 , Lavatv.BV.bvOr
+, Lavatv.BV.bvConcat
+, Lavatv.BV.bvExtract
+, Lavatv.BV.bit2bool
+, Lavatv.BV.bool2bit
 ) where
 
 import Prelude hiding ((<>))

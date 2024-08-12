@@ -6,11 +6,16 @@ License     : MIT
 -}
 
 module Lavatv.Verif (
-  Lavatv.Verif.test
+  Lavatv.Verif.bounded
+, Lavatv.Verif.checkSat
+, Lavatv.Verif.checkBounded
+, Lavatv.Verif.withNetlist
 ) where
 
 import Prelude hiding ((<>))
 import Data.Maybe
+import System.IO
+import System.Process
 
 import Lavatv.Core
 import Lavatv.Utils
@@ -86,7 +91,7 @@ defineTransition net prop = parens $ text "define-fun"
         ) livenet)
 
 makeZ3Faster :: Doc
-makeZ3Faster = text "(push)"
+makeZ3Faster = parens $ text "push"
 
 defineAll :: Netlist -> Signal -> Doc
 defineAll net prop = defineConstants net $+$ defineTransition net prop $+$ makeZ3Faster
@@ -107,6 +112,15 @@ quantifyTick prefix net body = foldr decl body livenet
         Just _ -> id
         Nothing -> \b -> parens $ text "forall" <+> (parens $ sigRef prefix (text "reg") s <+> text (sigSmt2Type (sigInfo s))) <+> b
 
+initialConstraint :: Doc -> Netlist -> Doc
+initialConstraint prefix net = vcat $ map cstr net
+  where
+    cstr s = case sigDef s of
+        Reg i _ _ -> parens $ text "assert" <+> (parens $ text "=" <+> sigRef prefix (text "reg") s <+> sigRef empty undefined i)
+        Comb _ -> empty
+        CstSample _ _ -> empty
+        UpSample _ _ -> empty
+
 transitionConstraint :: Doc -> Doc -> Doc -> Netlist -> Signal -> Doc
 transitionConstraint prefixPrev prefixNext propExpr net propSig = transition
   where
@@ -124,14 +138,33 @@ transitionConstraint prefixPrev prefixNext propExpr net propSig = transition
         UpSample _ _ -> empty
         Reg _ _ _ -> sigRef prefixPrev (text "reg") s <+> sigRef prefixNext (text "reg") s
 
-bounded :: Int -> Netlist -> Signal -> Doc
-bounded k net propSig = defineAll net propSig $+$ declarations $+$ assertions
+bounded :: Int -> (Netlist, Signal) -> Doc
+bounded depth (net, propSig) = defineAll net propSig $+$ declarations $+$ assertions $+$ check
   where
     tickPrefix i = text "bounded" <> int i <> text "_"
-    declarations = vcat (map (\i -> declProp i $+$ declareTick (tickPrefix i) net) [0..k])
+    declarations = vcat (map (\i -> declProp i $+$ declareTick (tickPrefix i) net) [0..depth])
     propName i = tickPrefix i <> text "prop"
     declProp i = parens $ text "declare-const" <+> propName i <+> text "Bool"
-    assertions = if k == 0 then text "(assert false)" else vcat $ map (\i -> parens $ text "assert" <+> transitionConstraint (tickPrefix i) (tickPrefix (i+1)) (propName i) net propSig) [0..k-1]
+    assertions =
+        initialConstraint (tickPrefix 0) net
+        $+$ (vcat $ map (\i -> parens $ text "assert" <+> transitionConstraint (tickPrefix i) (tickPrefix (i+1)) (propName i) net propSig) [0..depth-1])
+        $+$ (parens $ text "assert" <+> (parens $ text "not" <+> (parens $ hsep $ text "and" : text "true" : map (\i -> propName i) [0..depth-1])))
+    check = parens $ text "check-sat"
 
-test :: Signal -> Doc
-test s = bounded 1 (sortedNetlist s) s
+checkSat :: Doc -> IO Bool
+checkSat input = withCreateProcess solver \(Just hIn) (Just hOut) _ _ -> do
+    hSetBuffering hIn LineBuffering
+    hPutStrLn hIn $ renderStyle (Style OneLineMode 0 0) input
+    ln <- hGetLine hOut
+    case ln of
+        "sat" -> return True
+        "unsat" -> return False
+        _ -> error $ "Unexpected SMT output: '" ++ ln ++ "'"
+  where
+    solver = (proc "z3" ["-in"]) { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe }
+
+checkBounded :: Int -> (Netlist, Signal) -> IO Bool
+checkBounded depth circ = fmap not $ checkSat $ bounded depth circ
+
+withNetlist :: Signal -> (Netlist, Signal)
+withNetlist s = (sortedNetlist s, s)
