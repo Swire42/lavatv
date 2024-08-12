@@ -89,6 +89,7 @@ library
         TypeFamilies
         BlockArguments
         MonomorphismRestriction
+        UndecidableInstances
 
     ghc-options:
         -fno-cse

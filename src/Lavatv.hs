@@ -36,7 +36,7 @@ tmap2 (f :: forall a. Bit a -> Bit a) (x :: Bit clk, y :: Bit clk) = (fx :: Bit 
   where
     sx :: Bit (2*clk) = upsample x
     sy :: Bit (2*clk) = upsample y
-    z = ite (pulse ()) (sx, sy)
+    z = hite (pulse ()) (sx, sy)
     fz = f z
     fx = reg bvZeros $ delay bvZeros fz
     fy = reg bvZeros fz

@@ -67,7 +67,7 @@ pulse = Batch $ V.select @i @n x
 
 -- Use the value of rare instead of base every n ticks, with an offset of i
 pulseMux :: forall i n h. (KnownNat i, KnownPos n, (i+1) <= n, UHard h, KnownPos (ClockOf h)) => Batch n h -> Batch n h -> Batch n h
-pulseMux rare often = zipWithRaw (HB.ite) (pulse @i @n) (zip rare often)
+pulseMux rare often = zipWithRaw (HB.hite) (pulse @i @n) (zip rare often)
 
 -- Iterate through the values of a Vec over n base ticks
 sweepMux :: forall n h. (KnownPos n, UHard h, UHard (ReClock h 0), KnownNat (ClockOf (ReClock h 0)), KnownPos (ClockOf h)) => Vec n h -> Batch n h

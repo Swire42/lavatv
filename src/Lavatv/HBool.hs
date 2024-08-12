@@ -6,14 +6,16 @@ License     : MIT
 -}
 
 module Lavatv.HBool (
-  Lavatv.HBool.HBool(unHBool)
+  Lavatv.HBool.HBool(..)
+, Lavatv.HBool.sigInfoHBool
+, Lavatv.HBool.HEq(..)
 , Lavatv.HBool.htrue
 , Lavatv.HBool.hfalse
 , Lavatv.HBool.hnot
 , Lavatv.HBool.hand
 , Lavatv.HBool.hor
+, Lavatv.HBool.hite
 , Lavatv.HBool.pulse
-, Lavatv.HBool.ite
 ) where
 
 import Prelude
@@ -22,6 +24,7 @@ import Text.PrettyPrint
 
 import Lavatv.Nat
 import Lavatv.Core
+import Lavatv.Sim
 
 data HBool (clk :: Nat) = HBool { unHBool :: Signal }
 
@@ -40,6 +43,27 @@ instance UHard (HBool clk) where
 
     dontCare () = HBool $ sig_dontcare (sigInfoHBool @clk)
     symbolic = HBool . sig_symbolic (sigInfoHBool @clk)
+
+instance KnownNat clk => SimAs (HBool clk) Bool where
+    fromSim = HBool . sig_comb1 (sigInfoHBool @clk) (gateSimId @Bool) . unSim
+    toSim = Sim . sig_comb1 (sigInfoSim @clk) (gateSimId @Bool) . unHBool
+
+
+class (UHard h, KnownNat (ClockOf h)) => HEq h where
+    heq :: h -> h -> HBool (ClockOf h)
+
+instance KnownNat clk => HEq (HBool clk) where
+    heq a b = HBool $ sig_comb2 (sigInfoHBool @clk) ((gate "heq") {
+          gateSmt2=(gateFun2 \x y -> parens $ text "=" <+> x <+> y)
+        , gateSim=gateSim2 @Bool @Bool (==)
+        }) (unHBool a, unHBool b)
+
+instance (KnownNat clk, Typeable a, Eq a) => HEq (Sim a clk) where
+    heq a b = HBool $ sig_comb2 (sigInfoHBool @clk) ((gate "heq") {
+          gateSmt2=(gateFun2 \x y -> parens $ text "=" <+> x <+> y)
+        , gateSim=gateSim2 @a @a (==)
+        }) (unSim a, unSim b)
+
 
 htrue :: forall clk. KnownNat clk => HBool clk
 htrue = HBool $ sig_comb0 (sigInfoHBool @clk) ((gate "htrue") {
@@ -71,15 +95,15 @@ hor a b = HBool $ sig_comb2 (sigInfoHBool @clk) ((gate "hor") {
     , gateSim=gateSim2 (||)
     }) (unHBool a, unHBool b)
 
-pulse :: forall clk. KnownPos clk => () -> HBool clk
-pulse () = x
-    where x = delay htrue $ hnot x
-
-ite :: forall h clk. (UHard h, ClockOf h ~ clk, KnownNat clk) => HBool clk -> (h, h) -> h
-ite cond (a, b) = pack $ map (sigite (unHBool cond)) $ (unpack a `zip` unpack b)
+hite :: forall h clk. (UHard h, ClockOf h ~ clk, KnownNat clk) => HBool clk -> (h, h) -> h
+hite cond (a, b) = pack $ map (sigite (unHBool cond)) $ (unpack a `zip` unpack b)
     where
         sigite :: Signal -> (Signal, Signal) -> Signal
         sigite sigc (sigt, sigf) = sig_comb3 (sigInfo sigt) (gate "ite") {
               gateSmt2=(gateFun3 \c t f -> parens $ text "ite" <+> c <+> t <+> f)
             , gateSim=(gateFun3 \c t f -> if (fromDyn c (error "bad type")) then t else f)
             } $ (sigc, sigt, sigf)
+
+pulse :: forall clk. KnownPos clk => () -> HBool clk
+pulse () = x
+    where x = delay htrue $ hnot x

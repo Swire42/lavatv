@@ -60,7 +60,7 @@ module Lavatv.Vec (
 ) where
 
 import qualified Prelude
-import Prelude (error, Bool(..), (&&), (||), Maybe(..), ($), (.), (<*>), uncurry)
+import Prelude (undefined, error, (==), (/=), Bool(..), (&&), (||), Maybe(..), ($), (.), (<*>), uncurry)
 import qualified Data.List as L
 
 import Lavatv.Nat
@@ -69,21 +69,21 @@ data Vec (n :: Nat) a where
   Nil :: (n ~ 0) => Vec n a
   Cons :: forall n a. (1 <= n) => a -> Vec (n-1) a -> Vec n a
 
-assertEq :: forall a b v. (KnownNat a, KnownNat b) => (a ~ b => v) -> v
-assertEq x = ifEq @a @b x (error "assert failed")
-
-assertZero :: forall n v. KnownNat n => (n ~ 0 => v) -> v
-assertZero = assertEq @n @0
-
 fromList :: forall n a. KnownNat n => [a] -> Vec n a
-fromList [] = ifZero @n Nil (error "list too small")
-fromList (x:xs) = ifZero @n (error "list too large") (x `Cons` fromList @(n-1) xs)
+fromList l = if Prelude.length l /= valueOf @n then error "incorrect size" else aux l
+  where
+    aux :: forall n' a'. KnownNat n' => [a'] -> Vec n' a'
+    aux [] = ifZero @n' Nil undefined
+    aux (x:xs) = ifZero @n' undefined (x `Cons` fromList @(n'-1) xs)
 
 toList :: forall n a. KnownNat n => Vec n a -> [a]
-toList xs = ifZero @n [] (let y `Cons` ys = xs in y : toList @(n-1) ys)
+toList = ifZero @n (\Nil -> []) (\(x `Cons` xs) -> x : toList @(n-1) xs)
 
 instance (Prelude.Show [a], KnownNat n) => Prelude.Show (Vec n a) where
   show = Prelude.show . toList
+
+instance (Prelude.Eq [a], KnownNat n) => Prelude.Eq (Vec n a) where
+  (==) x y = toList x == toList y
 
 instance KnownNat n => Prelude.Functor (Vec n) where
   fmap = map
