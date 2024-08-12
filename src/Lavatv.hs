@@ -10,6 +10,7 @@ import Lavatv.Core
 import Lavatv.HBool
 import Lavatv.BV
 import Lavatv.Sim
+import Lavatv.Verif
 
 type Vec = V.Vec
 
