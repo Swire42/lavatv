@@ -96,7 +96,7 @@ hor a b = HBool $ sig_comb2 (sigInfoHBool @clk) ((gate "hor") {
     }) (unHBool a, unHBool b)
 
 hite :: forall h clk. (UHard h, ClockOf h ~ clk, KnownNat clk) => HBool clk -> (h, h) -> h
-hite cond (a, b) = pack $ map (sigite (unHBool cond)) $ (unpack a `zip` unpack b)
+hite cond (hthen, helse) = pack $ map (sigite (unHBool cond)) $ (unpack hthen `zip` unpack helse)
     where
         sigite :: Signal -> (Signal, Signal) -> Signal
         sigite sigc (sigt, sigf) = sig_comb3 (sigInfo sigt) (gate "ite") {

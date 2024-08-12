@@ -128,3 +128,9 @@ bvExtract a = BV $ sig_comb1 (sigInfoBV @(j-i) @clk) ((gate "bvExtract") {
       gateSmt2=(gateFun1 \x -> parens $ (parens $ text "_ extract" <+> (int $ valueOf @(j-1)) <+> (int $ valueOf @i)) <+> x)
     , gateSim=gateSim1 (V.drop @j @i . V.take @j @w @Bool)
     }) (unBV a)
+
+bit2bool :: forall clk. KnownNat clk => Bit clk -> HBool clk
+bit2bool = heq bvOnes
+
+bool2bit :: forall clk. KnownNat clk => HBool clk -> Bit clk
+bool2bit x = hite x (bvOnes, bvZeros)
