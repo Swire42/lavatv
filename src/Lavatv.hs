@@ -14,20 +14,20 @@ import Lavatv.Verif
 
 type Vec = V.Vec
 
-halfadd (a :: Bit _, b :: Bit _) = (s :: Bit _, c :: Bit _)
+halfAdder (a :: Bit _, b :: Bit _) = (s :: Bit _, c :: Bit _)
   where
     s = a `bvXor` b
     c = a `bvAnd` b
 
-fulladd (a :: Bit _, b :: Bit _, ci :: Bit _) = (s :: Bit _, co :: Bit _)
+fullAdder (a :: Bit _, b :: Bit _, ci :: Bit _) = (s :: Bit _, co :: Bit _)
   where
-    (t, c1) = halfadd (a, b)
-    (s, c2) = halfadd (ci, t)
+    (t, c1) = halfAdder (a, b)
+    (s, c2) = halfAdder (ci, t)
     co = c1 `bvOr` c2
 
-serialAdd (a :: Bit _, b :: Bit _) = (s :: Bit _)
+seqAdder (a :: Bit _, b :: Bit _) = (s :: Bit _)
   where
-    (s, c) = fulladd (a, b, delay bvZeros c)
+    (s, c) = fullAdder (a, b, delay bvZeros c)
 
 mux (sel :: Bit _) (x0 :: Bit _, x1 :: Bit _) = (x :: Bit _)
   where

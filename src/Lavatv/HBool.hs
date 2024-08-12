@@ -41,7 +41,7 @@ instance UHard (HBool clk) where
     type ClockOf (HBool clk) = clk
     type ReClock (HBool clk) c = HBool c
 
-    dontCare () = HBool $ sig_dontcare (sigInfoHBool @clk)
+    dontcare () = HBool $ sig_dontcare (sigInfoHBool @clk)
     symbolic = HBool . sig_symbolic (sigInfoHBool @clk)
 
 instance KnownNat clk => SimAs (HBool clk) Bool where

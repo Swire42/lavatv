@@ -47,7 +47,7 @@ instance UHard (Sim a clk) where
     type ClockOf (Sim a clk) = clk
     type ReClock (Sim a clk) c = Sim a c
 
-    dontCare () = Sim $ sig_dontcare (sigInfoSim @clk)
+    dontcare () = Sim $ sig_dontcare (sigInfoSim @clk)
     symbolic = Sim . sig_symbolic (sigInfoSim @clk)
 
 

@@ -22,6 +22,7 @@ module Lavatv.Core (
 , Lavatv.Core.Signal(..)
 , Lavatv.Core.makeSignal
 , Lavatv.Core.sigId
+, Lavatv.Core.HUnit(..)
 , Lavatv.Core.Hard(..)
 , Lavatv.Core.UHard(..)
 , Lavatv.Core.SpedUp
@@ -120,11 +121,38 @@ class (Hard h) => UHard h where
     delay :: (KnownPos (ClockOf h), UHard (ReClock h 0)) => ReClock h 0 -> h -> h
     delay ini nxt = pack $ zipWith (\i n -> sig_reg (valueOf @(ClockOf h)) i 1 n) (unpack ini) (unpack nxt)
 
-    dontCare :: KnownNat (ClockOf h) => () -> h
+    dontcare :: KnownNat (ClockOf h) => () -> h
 
     symbolic :: KnownNat (ClockOf h) => String -> h
 
 type SpedUp h (k :: Nat) = ReClock h (k * ClockOf h)
+
+data HUnit (clk :: Nat) = HUnit
+
+instance Hard (HUnit clk) where
+    sigsCount = 0
+    unpack HUnit = []
+    pack [] = HUnit
+    pack _ = error "bad size"
+
+instance UHard (HUnit clk) where
+    type ClockOf (HUnit clk) = clk
+    type ReClock (HUnit clk) c = HUnit c
+
+    dontcare () = HUnit
+    symbolic _ = HUnit
+
+instance (Hard a, Hard b) => Hard (a, b) where
+    sigsCount = sigsCount @a + sigsCount @b
+    unpack (x, y) = unpack x ++ unpack y
+    pack l = let (lx, ly) = splitAt (sigsCount @a) l in (pack lx, pack ly)
+
+instance (UHard a, UHard b, ClockOf a ~ ClockOf b) => UHard (a, b) where
+    type ClockOf (a, b) = ClockOf a
+    type ReClock (a, b) c = (ReClock a c, ReClock b c)
+
+    dontcare () = (dontcare (), dontcare ())
+    symbolic name = (symbolic (name++"_0"), symbolic (name++"_1"))
 
 instance (KnownNat n, Hard h) => Hard (Vec n h) where
     sigsCount = (valueOf @n) * sigsCount @h
@@ -136,20 +164,8 @@ instance (KnownNat n, UHard h) => UHard (Vec n h) where
     type ClockOf (Vec n h) = ClockOf h
     type ReClock (Vec n h) c = Vec n (ReClock h c)
 
-    dontCare () = V.map dontCare $ V.replicate ()
+    dontcare () = V.map dontcare $ V.replicate ()
     symbolic name = V.map (\i -> symbolic (name ++ "_" ++ show i)) $ V.fromList [0..(valueOf @n)-1]
-
-instance (Hard a, Hard b) => Hard (a, b) where
-    sigsCount = sigsCount @a + sigsCount @b
-    unpack (x, y) = unpack x ++ unpack y
-    pack l = let (lx, ly) = splitAt (sigsCount @a) l in (pack lx, pack ly)
-
-instance (UHard a, UHard b, ClockOf a ~ ClockOf b) => UHard (a, b) where
-    type ClockOf (a, b) = ClockOf a
-    type ReClock (a, b) c = (ReClock a c, ReClock b c)
-
-    dontCare () = (dontCare (), dontCare ())
-    symbolic name = (symbolic (name++"_0"), symbolic (name++"_1"))
 
 sig_comb :: forall n. KnownNat n => SigInfo -> Gate n -> Vec n Signal -> Signal
 sig_comb info g ins = assert (V.all ((sigClock info ==) . sigClock . sigInfo) ins) $ makeSignal info $ Comb $ GateOp g ins

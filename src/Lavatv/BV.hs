@@ -50,7 +50,7 @@ instance (KnownPos w, KnownNat clk) => UHard (BV w clk) where
     type ClockOf (BV w clk) = clk
     type ReClock (BV w clk) c = BV w c
 
-    dontCare () = BV $ sig_dontcare (sigInfoBV @w @clk)
+    dontcare () = BV $ sig_dontcare (sigInfoBV @w @clk)
     symbolic = BV . sig_symbolic (sigInfoBV @w @clk)
 
 instance (KnownPos w, KnownNat clk) => SimAs (BV w clk) (Vec w Bool) where

@@ -81,7 +81,7 @@ sweep = sweepMux . upsample @(Vec n h) @n
 
 -- Iterate through the values of a Vec in a single base tick
 collect :: forall n h. (KnownPos n, UHard h, UHard (SpedUp h n), UHard (ReClock h 0), KnownPos (ClockOf h), KnownPos (ClockOf (SpedUp h n)), ReClock (SpedUp h n) 0 ~ ReClock h 0, ClockOf (ReClock h 0) ~ 0) => Vec n (ReClock h 0) -> Batch n (SpedUp h n) -> Vec n h
-collect ini b = reg ini $ V.reverse $ V.map unBatch $ V.iterate @n (shift (dontCare () :: ReClock h 0)) b
+collect ini b = reg ini $ V.reverse $ V.map unBatch $ V.iterate @n (shift (dontcare () :: ReClock h 0)) b
 
 -- Apply f every n fast ticks, with an offset of i
 update :: forall i n h. (KnownNat i, KnownPos n, (i+1) <= n, UHard h, KnownPos (ClockOf h)) => (h -> h) -> Batch n h -> Batch n h
@@ -121,7 +121,7 @@ shift ini x = wrap $ delay ini $ lazyUnwrap x
 -- ini[i] is used iff i%n == 0
 -- Tip: ini can typically be `replicate cst`
 shiftReset :: forall n a. (KnownPos n, UHard a, UHard (ReClock a 0), KnownPos (ClockOf a), KnownNat (ClockOf (ReClock a 0))) => Batch n a -> Batch n a -> Batch n a
-shiftReset ini x = pulseMux @0 ini $ shift (dontCare ()) x
+shiftReset ini x = pulseMux @0 ini $ shift (dontcare ()) x
 
 -- Composed short delays, "shifting" values one whole base tick toward the future
 fullDelay :: forall n a. (KnownPos n, UHard a, UHard (ReClock a 0), KnownPos (ClockOf a)) => ReClock a 0 -> Batch n a -> Batch n a

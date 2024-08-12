@@ -17,6 +17,12 @@ import Lavatv.Core
 import Lavatv.SMT
 import Lavatv.HBool
 
+red = "\x1b[0;31m"
+green = "\x1b[0;32m"
+yellow = "\x1b[0;33m"
+blue = "\x1b[0;34m"
+reset = "\x1b[0m"
+
 check :: forall h. (UHard h, ClockOf h ~ 1) => Bool -> (h -> HBool 1) -> IO Bool
 check verbose f = aux 0
   where
@@ -27,16 +33,16 @@ check verbose f = aux 0
         bmc <- checkBounded depth circ
         case bmc of
             False -> do
-                ifVerb (putStrLn "falsifiable")
+                ifVerb (putStrLn $ red++"falsifiable"++reset)
                 return False
             True -> do
-                ifVerb (putStrLn "verified")
+                ifVerb (putStrLn $ blue++"verified"++reset)
                 ifVerb (putStr (render $ text "Safe-neighborhood induction, depth" <+> int depth <> text ": ") >> hFlush stdout)
                 ind <- checkSafeNeighborhood depth circ
                 case ind of
                     True -> do
-                        ifVerb (putStrLn "verified")
+                        ifVerb (putStrLn $ green++"verified"++reset)
                         return True
                     False -> do
-                        ifVerb (putStrLn "insufficient")
+                        ifVerb (putStrLn $ yellow++"insufficient"++reset)
                         aux (depth+1)
