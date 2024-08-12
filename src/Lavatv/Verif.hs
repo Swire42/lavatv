@@ -7,8 +7,10 @@ License     : MIT
 
 module Lavatv.Verif (
   Lavatv.Verif.bounded
+, Lavatv.Verif.safeNeighborhood
 , Lavatv.Verif.checkSat
 , Lavatv.Verif.checkBounded
+, Lavatv.Verif.checkSafeNeighborhood
 , Lavatv.Verif.withNetlist
 ) where
 
@@ -145,10 +147,25 @@ bounded depth (net, propSig) = defineAll net propSig $+$ declarations $+$ assert
     declarations = vcat (map (\i -> declProp i $+$ declareTick (tickPrefix i) net) [0..depth])
     propName i = tickPrefix i <> text "prop"
     declProp i = parens $ text "declare-const" <+> propName i <+> text "Bool"
-    assertions =
-        initialConstraint (tickPrefix 0) net
+    assertions = initialConstraint (tickPrefix 0) net
         $+$ (vcat $ map (\i -> parens $ text "assert" <+> transitionConstraint (tickPrefix i) (tickPrefix (i+1)) (propName i) net propSig) [0..depth-1])
         $+$ (parens $ text "assert" <+> (parens $ text "not" <+> (parens $ hsep $ text "and" : text "true" : map (\i -> propName i) [0..depth-1])))
+    check = parens $ text "check-sat"
+
+safeNeighborhood :: Int -> (Netlist, Signal) -> Doc
+safeNeighborhood depth (net, propSig) = defineAll net propSig $+$ declarations $+$ assertions $+$ check
+  where
+    tickPrefix i = text "induction" <> int i <> text "_"
+    safePrefix i = if i == 0 then tickPrefix 0 else text "safe" <> int i <> text "_"
+    declarations = vcat (map (\i -> declProp i $+$ declareTick (tickPrefix i) net) [0..depth+1])
+    propName i = tickPrefix i <> text "prop"
+    declProp i = parens $ text "declare-const" <+> propName i <+> text "Bool"
+    safe = foldr (\i -> quantifyTick (safePrefix i) net) (parens $ hsep $ text "and" : text "true" : map (\i ->
+            transitionConstraint (safePrefix i) (safePrefix (i+1)) (text "true") net propSig
+        ) [0..depth]) [1..depth+1]
+    assertions = (parens $ text "assert" <+> safe)
+        $+$ (vcat $ map (\i -> parens $ text "assert" <+> transitionConstraint (tickPrefix i) (tickPrefix (i+1)) (text "true") net propSig) [0..depth-1])
+        $+$ (parens $ text "assert" <+> transitionConstraint (tickPrefix depth) (tickPrefix (depth+1)) (text "false") net propSig)
     check = parens $ text "check-sat"
 
 checkSat :: Doc -> IO Bool
@@ -165,6 +182,9 @@ checkSat input = withCreateProcess solver \(Just hIn) (Just hOut) _ _ -> do
 
 checkBounded :: Int -> (Netlist, Signal) -> IO Bool
 checkBounded depth circ = fmap not $ checkSat $ bounded depth circ
+
+checkSafeNeighborhood :: Int -> (Netlist, Signal) -> IO Bool
+checkSafeNeighborhood depth circ = fmap not $ checkSat $ safeNeighborhood depth circ
 
 withNetlist :: Signal -> (Netlist, Signal)
 withNetlist s = (sortedNetlist s, s)
