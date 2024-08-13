@@ -8,6 +8,7 @@ License     : MIT
 module Lavatv.Retime (
   Lavatv.Retime.dynUnroll
 , Lavatv.Retime.unroll
+, Lavatv.Retime.unroll1
 , Lavatv.Retime.slowdown
 ) where
 
@@ -97,6 +98,9 @@ unroll f inp = V.map pack $ V.transposeLV $ map (V.fromList . (rmapFinal `mGet`)
                 UpSample k x -> concatMap (replicate k) (rmap2 `mGet` x)
                 Reg i k x -> let prev = lastN k (rmap2 `mGet` x) in sig_delay clk i (last prev) : lazyList (len-1) (init prev)
         in ret
+
+unroll1 :: forall a b. (UHard a, UHard b, KnownPos (ClockOf a), ClockOf a ~ ClockOf b) => (a -> b) -> (a -> b)
+unroll1 f = V.destruct1 . unroll f . V.construct1
 
 slowdown :: forall a b. (UHard a, UHard b, KnownPos (ClockOf a), ClockOf a ~ ClockOf b) => Int -> (a -> b) -> (a -> b)
 slowdown count f inp = pack $ map (rmapFinal `mGet`) (unpack out)

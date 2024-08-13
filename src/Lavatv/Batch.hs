@@ -7,7 +7,6 @@ License     : MIT
 
 module Lavatv.Batch (
   Lavatv.Batch.Batch(..),
-  Lavatv.Batch.wrap,
   Lavatv.Batch.lazyUnwrap,
 
   Lavatv.Batch.flatten,
@@ -46,19 +45,16 @@ type Vec = V.Vec
 
 data Batch (n :: Nat) (h :: Type) = (1 <= n) => Batch { unBatch :: h }
 
-wrap :: forall n h. (1 <= n) => h -> Batch n h
-wrap ~x = Batch { unBatch=x }
-
 lazyShape ~(Batch { unBatch=x }) = Batch { unBatch=x }
 lazyUnwrap ~(Batch { unBatch=x }) = x
 
 -- Identity
 flatten :: forall n m h. (KnownPos n, KnownPos m, 1 <= n*m) => Batch n (Batch m h) -> Batch (n*m) h
-flatten = wrap @(n*m) . unBatch . unBatch
+flatten = Batch @(n*m) . unBatch . unBatch
 
 -- Identity
 unflatten :: forall n m h. (KnownPos n, KnownPos m) => Batch (n*m) h -> Batch n (Batch m h)
-unflatten = wrap . wrap . unBatch
+unflatten = Batch . Batch . unBatch
 
 -- Pulse (1) every n fast ticks, with an offset of i.
 pulse :: forall i n clk. (KnownNat i, KnownPos n, (i+1) <= n, KnownPos clk) => Batch n (HBool clk)
@@ -89,11 +85,11 @@ update f base = pulseMux @i @n (lift f base) base
 
 -- Wiring
 zip :: forall n a b. (KnownPos n, UHard a, UHard b, ClockOf a ~ ClockOf b) => Batch n a -> Batch n b -> Batch n (a, b)
-zip x y = wrap $ (unBatch x, unBatch y)
+zip x y = Batch $ (unBatch x, unBatch y)
 
 -- Wiring
 unzip :: forall n a b. KnownPos n => Batch n (a, b) -> (Batch n a, Batch n b)
-unzip = (wrap *** wrap) . unBatch
+unzip = (Batch *** Batch) . lazyUnwrap
 
 -- Apply slowed-down circuit
 map :: forall n a b. (KnownPos n, UHard a, UHard b, KnownPos (ClockOf a), ClockOf a ~ ClockOf b) => (a -> b) -> Batch n a -> Batch n b
@@ -101,7 +97,7 @@ map f x = Batch $ slowdown (valueOf @n) f $ unBatch x
 
 -- Apply circuit without slowing it down
 lift :: forall n a b. KnownPos n => (a -> b) -> Batch n a -> Batch n b
-lift f = wrap . f . unBatch
+lift f = Batch . f . unBatch
 
 -- Merge using slowed-down circuit
 zipWith :: (KnownPos n, UHard a, UHard b, UHard c, KnownPos (ClockOf a), ClockOf a ~ ClockOf b, ClockOf a ~ ClockOf c) => (a -> b -> c) -> Batch n a -> Batch n b -> Batch n c
@@ -114,7 +110,7 @@ zipWithRaw f xs ys = lift (uncurry f) $ zip xs ys
 -- Short delay, "shifting" values one tick toward the future,
 -- with a constant value for the first ever tick
 shift :: forall n a. (KnownPos n, UHard a, UHard (ReClock a 0), KnownPos (ClockOf a)) => ReClock a 0 -> Batch n a -> Batch n a
-shift ini x = wrap $ delay ini $ lazyUnwrap x
+shift ini x = Batch $ delay ini $ lazyUnwrap x
 
 -- Short delay, "shifting" values one tick toward the future,
 -- resetting to a dynamic value every n ticks.

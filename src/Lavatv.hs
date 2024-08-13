@@ -3,7 +3,9 @@ module Lavatv where
 import Prelude
 
 import Lavatv.Nat
+import Lavatv.Vec(Vec)
 import qualified Lavatv.Vec as V
+import Lavatv.Batch(Batch)
 import qualified Lavatv.Batch as B
 
 import Lavatv.Core
@@ -11,8 +13,6 @@ import Lavatv.HBool
 import Lavatv.BV
 import Lavatv.Sim
 import Lavatv.Verif
-
-type Vec = V.Vec
 
 halfAdder (a :: Bit _, b :: Bit _) = (s :: Bit _, c :: Bit _)
   where
@@ -28,6 +28,17 @@ fullAdder (a :: Bit _, b :: Bit _, ci :: Bit _) = (s :: Bit _, co :: Bit _)
 seqAdder (a :: Bit _, b :: Bit _) = (s :: Bit _)
   where
     (s, c) = fullAdder (a, b, delay bvZeros c)
+
+rippleAdder (a :: Vec n (Bit _)) (b :: Vec n (Bit _)) = (s :: Vec (n+1) (Bit _))
+  where
+    sc = V.zipWith (\c' (a', b') -> fullAdder (a', b', c')) (bvZeros `V.Cons` V.init c) (V.zip a b)
+    c = V.map snd sc
+    s = V.map fst sc `V.append` V.singleton (V.last c)
+
+batchAdder (a :: Batch n (Bit _)) (b :: Batch n (Bit _)) = (s :: Batch n (Bit _))
+  where
+    s = B.scanReset kernel (B.Batch bvZeros) (B.zip a b)
+    kernel ci (a', b') = let (s', co) = fullAdder (a', b', ci) in (co, s')
 
 mux (sel :: Bit _) (x0 :: Bit _, x1 :: Bit _) = (x :: Bit _)
   where

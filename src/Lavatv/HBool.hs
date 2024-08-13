@@ -25,6 +25,8 @@ import Text.PrettyPrint
 import Lavatv.Nat
 import Lavatv.Core
 import Lavatv.Sim
+import Lavatv.Vec(Vec)
+import qualified Lavatv.Vec as V
 
 data HBool (clk :: Nat) = HBool { unHBool :: Signal }
 
@@ -63,6 +65,13 @@ instance (KnownNat clk, Typeable a, Eq a) => HEq (Sim a clk) where
           gateSmt2=(gateFun2 \x y -> parens $ text "=" <+> x <+> y)
         , gateSim=gateSim2 @a @a (==)
         }) (unSim a, unSim b)
+
+instance (HEq a, HEq b, ClockOf a ~ ClockOf b) => HEq (a, b) where
+    heq (xa, xb) (ya, yb) = (xa `heq` ya) `hand` (xb `heq` yb)
+
+instance (KnownNat n, HEq h) => HEq (Vec n h) where
+    heq V.Nil V.Nil = htrue
+    heq (ha `V.Cons` ta) (hb `V.Cons` tb) = (ha `heq` hb) `hand` (ta `heq` tb)
 
 
 htrue :: forall clk. KnownNat clk => HBool clk

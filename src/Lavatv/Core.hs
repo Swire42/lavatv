@@ -145,7 +145,11 @@ instance UHard (HUnit clk) where
 instance (Hard a, Hard b) => Hard (a, b) where
     sigsCount = sigsCount @a + sigsCount @b
     unpack (x, y) = unpack x ++ unpack y
-    pack l = let (lx, ly) = splitAt (sigsCount @a) l in (pack lx, pack ly)
+    pack l = let (lx, ly) = splitAt (sigsCount @a) l in (pack (lazyList (sigsCount @a) lx), pack (lazyList (sigsCount @a) ly))
+        where
+            lazyList :: Int -> [t] -> [t]
+            lazyList 0 ~([]) = []
+            lazyList n ~(x:xs) = x : lazyList (n-1) xs
 
 instance (UHard a, UHard b, ClockOf a ~ ClockOf b) => UHard (a, b) where
     type ClockOf (a, b) = ClockOf a

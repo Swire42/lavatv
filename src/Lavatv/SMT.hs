@@ -86,7 +86,7 @@ defineTransition net prop = parens $ text "define-fun"
             <+> (parens $ sigRef empty (text "next") s <+> (text $ sigSmt2Type (sigInfo s)))
     body = foldr letsig inner livenet
     letsig s = maybe id (smtLet (sigRef empty undefined s)) (sigCombDef (text "prev") s)
-    inner = parens $ (text "and") <+> smtEq (text "prop") (sigRef empty undefined prop)
+    inner = parens $ (text "and") <+> smtEq (text "prop") (sigRef empty (text "prev") prop)
         <+> (hsep $ map (\s -> case sigDef s of
             Reg _ _ x -> smtEq (sigRef empty (text "next") s) (sigRef empty (text "prev") x)
             _ -> empty
@@ -98,33 +98,55 @@ makeZ3Faster = parens $ text "push"
 defineAll :: Netlist -> Signal -> Doc
 defineAll net prop = defineConstants net $+$ defineTransition net prop $+$ makeZ3Faster
 
-declareTick :: Doc -> Netlist -> Doc
-declareTick prefix net = vcat $ map decl livenet
+declareTickInput :: Doc -> Netlist -> Doc
+declareTickInput prefix net = vcat $ map decl livenet
   where
     livenet = filter (\s -> sigClock (sigInfo s) > 0) net
-    decl s = case sigCombDef undefined s of
-        Just _ -> empty
-        Nothing -> parens $ text "declare-const" <+> sigRef prefix (text "reg") s <+> text (sigSmt2Type (sigInfo s))
+    decl s = case sigDef s of
+        Comb DontCare -> parens $ text "declare-const" <+> sigRef prefix undefined s <+> text (sigSmt2Type (sigInfo s))
+        Comb (Symbolic _) -> parens $ text "declare-const" <+> sigRef prefix undefined s <+> text (sigSmt2Type (sigInfo s))
+        _ -> empty
 
-quantifyTick :: Doc -> Netlist -> Doc -> Doc
-quantifyTick prefix net body = foldr decl body livenet
+declareTickState :: Doc -> Netlist -> Doc
+declareTickState prefix net = vcat $ map decl livenet
   where
     livenet = filter (\s -> sigClock (sigInfo s) > 0) net
-    decl s = case sigCombDef undefined s of
-        Just _ -> id
-        Nothing -> \b -> parens $ text "forall" <+> (parens $ parens $ sigRef prefix (text "reg") s <+> text (sigSmt2Type (sigInfo s))) <+> b
+    decl s = case sigDef s of
+        Reg _ _ _ -> parens $ text "declare-const" <+> sigRef prefix (text "reg") s <+> text (sigSmt2Type (sigInfo s))
+        _ -> empty
+
+quantifyTickInput :: Doc -> Netlist -> Doc -> Doc
+quantifyTickInput prefix net body = foldr decl body livenet
+  where
+    livenet = filter (\s -> sigClock (sigInfo s) > 0) net
+    decl s = case sigDef s of
+        Comb DontCare -> \b -> parens $ text "forall" 
+            <+> (parens $ parens $ sigRef prefix undefined s <+> text (sigSmt2Type (sigInfo s)))
+            <+> b
+        Comb (Symbolic _) -> \b -> parens $ text "forall" 
+            <+> (parens $ parens $ sigRef prefix undefined s <+> text (sigSmt2Type (sigInfo s)))
+            <+> b
+        _ -> id
+
+quantifyTickState :: Doc -> Netlist -> Doc -> Doc
+quantifyTickState prefix net body = foldr decl body livenet
+  where
+    livenet = filter (\s -> sigClock (sigInfo s) > 0) net
+    decl s = case sigDef s of
+        Reg _ _ _ -> \b -> parens $ text "exists" 
+            <+> (parens $ parens $ sigRef prefix (text "reg") s <+> text (sigSmt2Type (sigInfo s)))
+            <+> b
+        _ -> id
 
 initialConstraint :: Doc -> Netlist -> Doc
 initialConstraint prefix net = vcat $ map cstr net
   where
     cstr s = case sigDef s of
         Reg i _ _ -> parens $ text "assert" <+> (parens $ text "=" <+> sigRef prefix (text "reg") s <+> sigRef empty undefined i)
-        Comb _ -> empty
-        CstSample _ _ -> empty
-        UpSample _ _ -> empty
+        _ -> empty
 
-transitionConstraint :: Doc -> Doc -> Doc -> Netlist -> Signal -> Doc
-transitionConstraint prefixPrev prefixNext propExpr net propSig = transition
+transitionConstraint :: Doc -> Doc -> Doc -> Doc -> Netlist -> Signal -> Doc
+transitionConstraint prefixPrev prefixInput prefixNext propExpr net propSig = transition
   where
     livenet = filter (\s -> sigClock (sigInfo s) > 0) net
     transitionName = text "transition" <> int (sigId propSig)
@@ -133,8 +155,8 @@ transitionConstraint prefixPrev prefixNext propExpr net propSig = transition
         <+> args
     args = hsep $ map arg livenet
     arg s = case sigDef s of
-        Comb DontCare -> sigRef prefixPrev undefined s
-        Comb (Symbolic _) -> sigRef prefixPrev undefined s
+        Comb DontCare -> sigRef prefixInput undefined s
+        Comb (Symbolic _) -> sigRef prefixInput undefined s
         Comb (GateOp _ _) -> empty
         CstSample _ _ -> empty
         UpSample _ _ -> empty
@@ -144,11 +166,11 @@ bounded :: Int -> (Netlist, Signal) -> Doc
 bounded depth (net, propSig) = defineAll net propSig $+$ declarations $+$ assertions $+$ check
   where
     tickPrefix i = text "bounded" <> int i <> text "_"
-    declarations = vcat (map (\i -> declProp i $+$ declareTick (tickPrefix i) net) [0..depth])
+    declarations = vcat (map (\i -> declProp i $+$ declareTickInput (tickPrefix i) net $+$ declareTickState (tickPrefix i) net) [0..depth-1]) $+$ declareTickState (tickPrefix depth) net
     propName i = tickPrefix i <> text "prop"
     declProp i = parens $ text "declare-const" <+> propName i <+> text "Bool"
     assertions = initialConstraint (tickPrefix 0) net
-        $+$ (vcat $ map (\i -> parens $ text "assert" <+> transitionConstraint (tickPrefix i) (tickPrefix (i+1)) (propName i) net propSig) [0..depth-1])
+        $+$ (vcat $ map (\i -> parens $ text "assert" <+> transitionConstraint (tickPrefix i) (tickPrefix i) (tickPrefix (i+1)) (propName i) net propSig) [0..depth-1])
         $+$ (parens $ text "assert" <+> (parens $ text "not" <+> (parens $ hsep $ text "and" : text "true" : map (\i -> propName i) [0..depth-1])))
     check = parens $ text "check-sat"
 
@@ -156,16 +178,12 @@ safeNeighborhood :: Int -> (Netlist, Signal) -> Doc
 safeNeighborhood depth (net, propSig) = defineAll net propSig $+$ declarations $+$ assertions $+$ check
   where
     tickPrefix i = text "induction" <> int i <> text "_"
-    safePrefix i = if i == 0 then tickPrefix 0 else text "safe" <> int i <> text "_"
-    declarations = vcat (map (\i -> declProp i $+$ declareTick (tickPrefix i) net) [0..depth+1])
-    propName i = tickPrefix i <> text "prop"
-    declProp i = parens $ text "declare-const" <+> propName i <+> text "Bool"
-    safe = foldr (\i -> quantifyTick (safePrefix i) net) (parens $ hsep $ text "and" : text "true" : map (\i ->
-            transitionConstraint (safePrefix i) (safePrefix (i+1)) (text "true") net propSig
-        ) [0..depth-1]) [1..depth]
+    safePrefix i = text "safe" <> int i <> text "_"
+    declarations = vcat (map (\i -> declareTickInput (tickPrefix i) net $+$ declareTickState (tickPrefix i) net) [0..depth]) $+$ declareTickState (tickPrefix (depth+1)) net
+    safe = foldr (\i x -> quantifyTickInput (safePrefix i) net $ quantifyTickState (safePrefix (i+1)) net $ parens $ text "and" <+> transitionConstraint (if i == 0 then tickPrefix i else safePrefix i) (safePrefix i) (safePrefix (i+1)) (text "true") net propSig <+> x) (text "true") [0..depth-1]
     assertions = (parens $ text "assert" <+> safe)
-        $+$ (vcat $ map (\i -> parens $ text "assert" <+> transitionConstraint (tickPrefix i) (tickPrefix (i+1)) (text "true") net propSig) [0..depth-1])
-        $+$ (parens $ text "assert" <+> transitionConstraint (tickPrefix depth) (tickPrefix (depth+1)) (text "false") net propSig)
+        $+$ (vcat $ map (\i -> parens $ text "assert" <+> transitionConstraint (tickPrefix i) (tickPrefix i) (tickPrefix (i+1)) (text "true") net propSig) [0..depth-1])
+        $+$ (parens $ text "assert" <+> transitionConstraint (tickPrefix depth) (tickPrefix depth) (tickPrefix (depth+1)) (text "false") net propSig)
     check = parens $ text "check-sat"
 
 checkSat :: Doc -> IO Bool
