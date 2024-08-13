@@ -14,31 +14,37 @@ import Lavatv.BV
 import Lavatv.Sim
 import Lavatv.Verif
 
-halfAdder (a :: Bit _, b :: Bit _) = (s :: Bit _, c :: Bit _)
+halfAdder :: forall clk. _ => Bit clk -> Bit clk -> (Bit clk, Bit clk)
+halfAdder a b = (s, c)
   where
     s = a `bvXor` b
     c = a `bvAnd` b
 
-fullAdder (a :: Bit _, b :: Bit _, ci :: Bit _) = (s :: Bit _, co :: Bit _)
+fullAdder :: forall clk. _ => Bit clk -> Bit clk -> Bit clk -> (Bit clk, Bit clk)
+fullAdder a b ci = (s, co)
   where
-    (t, c1) = halfAdder (a, b)
-    (s, c2) = halfAdder (ci, t)
+    (t, c1) = halfAdder a b
+    (s, c2) = halfAdder ci t
     co = c1 `bvOr` c2
 
-seqAdder (a :: Bit _, b :: Bit _) = (s :: Bit _)
+seqAdder :: forall clk. _ => Bit clk -> Bit clk -> Bit clk
+seqAdder a b = s
   where
-    (s, c) = fullAdder (a, b, delay bvZeros c)
+    (s, c) = fullAdder a b (delay bvZeros c)
 
-rippleAdder (a :: Vec n (Bit _)) (b :: Vec n (Bit _)) = (s :: Vec (n+1) (Bit _))
+-- MSB is the closest to Nil (/= BV)
+rippleAdder :: forall clk n. _ => Vec n (Bit clk) -> Vec n (Bit clk) -> Vec (n+1) (Bit clk)
+rippleAdder a b = s
   where
-    sc = V.zipWith (\c' (a', b') -> fullAdder (a', b', c')) (bvZeros `V.Cons` V.init c) (V.zip a b)
+    sc = V.zipWith (\c' (a', b') -> fullAdder a' b' c') (bvZeros `V.Cons` V.init c) (V.zip a b)
     c = V.map snd sc
     s = V.map fst sc `V.append` V.singleton (V.last c)
 
-batchAdder (a :: Batch n (Bit _)) (b :: Batch n (Bit _)) = (s :: Batch n (Bit _))
+batchAdder :: forall clk n. _ => Batch n (Bit clk) -> Batch n (Bit clk) -> Batch n (Bit clk)
+batchAdder a b = s
   where
     s = B.scanReset kernel (B.Batch bvZeros) (B.zip a b)
-    kernel ci (a', b') = let (s', co) = fullAdder (a', b', ci) in (co, s')
+    kernel ci (a', b') = let (s', co) = fullAdder a' b' ci in (co, s')
 
 mux (sel :: Bit _) (x0 :: Bit _, x1 :: Bit _) = (x :: Bit _)
   where
