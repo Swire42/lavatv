@@ -105,7 +105,7 @@ class Hard h where
     unpack :: h -> [Signal]
     pack :: [Signal] -> h
 
-class (Hard h) => UHard h where
+class (Hard h, UHard (ReClock h 0), ClockOf (ReClock h 0) ~ 0, ReClock (ReClock h 0) 0 ~ ReClock h 0) => UHard h where
     type ClockOf h :: Nat
     type ReClock h (c :: Nat) :: Type
 
@@ -115,10 +115,10 @@ class (Hard h) => UHard h where
     upsample :: forall k. (KnownPos k, KnownPos (ClockOf h), UHard (SpedUp h k)) => h -> SpedUp h k
     upsample = pack . map (sig_upsample (valueOf @(k * ClockOf h)) (valueOf @k)) . unpack
 
-    reg :: forall k. (KnownPos k, KnownPos (ClockOf h), UHard (ReClock h 0), UHard (SpedUp h k)) => ReClock h 0 -> SpedUp h k -> h
+    reg :: forall k. (KnownPos k, KnownPos (ClockOf h), UHard (SpedUp h k)) => ReClock h 0 -> SpedUp h k -> h
     reg ini nxt = pack $ zipWith (\i n -> sig_reg (valueOf @(ClockOf h)) i (valueOf @k) n) (unpack ini) (unpack nxt)
 
-    delay :: (KnownPos (ClockOf h), UHard (ReClock h 0)) => ReClock h 0 -> h -> h
+    delay :: (KnownPos (ClockOf h)) => ReClock h 0 -> h -> h
     delay ini nxt = pack $ zipWith (\i n -> sig_reg (valueOf @(ClockOf h)) i 1 n) (unpack ini) (unpack nxt)
 
     dontcare :: KnownNat (ClockOf h) => () -> h

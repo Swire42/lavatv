@@ -42,7 +42,7 @@ lazyList :: Int -> [a] -> [a]
 lazyList 0 _       = []
 lazyList n l = head l : lazyList (n-1) (tail l)
 
-dynUnroll :: forall a b. (UHard a, UHard b, KnownPos (ClockOf a), ClockOf a ~ ClockOf b, UHard (ReClock a 0), UHard (ReClock b 0)) => (a -> b) -> [ReClock a 0] -> [ReClock b 0]
+dynUnroll :: forall a b. (UHard a, UHard b, KnownPos (ClockOf a), ClockOf a ~ ClockOf b) => (a -> b) -> [ReClock a 0] -> [ReClock b 0]
 dynUnroll f inp = limit inp $ map pack $ transpose $ map (rmapFinal `mGet`) (unpack out)
   where
     symb = symbolic "dynUnroll"

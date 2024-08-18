@@ -91,6 +91,7 @@ library
         BlockArguments
         MonomorphismRestriction
         UndecidableInstances
+        UndecidableSuperClasses
 
     ghc-options:
         -fno-cse

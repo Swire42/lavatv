@@ -66,17 +66,17 @@ pulseMux :: forall i n h. (KnownNat i, KnownPos n, (i+1) <= n, UHard h, KnownPos
 pulseMux rare often = zipWithRaw (HB.hite) (pulse @i @n) (zip rare often)
 
 -- Iterate through the values of a Vec over n base ticks
-sweepMux :: forall n h. (KnownPos n, UHard h, UHard (ReClock h 0), KnownNat (ClockOf (ReClock h 0)), KnownPos (ClockOf h)) => Vec n h -> Batch n h
+sweepMux :: forall n h. (KnownPos n, UHard h, KnownPos (ClockOf h)) => Vec n h -> Batch n h
 sweepMux v = Batch $ V.select @0 $ unBatch shreg
   where
     shreg = shiftReset (Batch @n v) (lift V.rotateL shreg) -- note: inneficient
 
 -- Iterate through the values of a Vec in a single base tick
-sweep :: forall n h. (KnownPos n, UHard h, UHard (SpedUp h n), UHard (ReClock (SpedUp h n) 0), KnownNat (ClockOf (ReClock (SpedUp h n) 0)), KnownPos (ClockOf h), KnownPos (ClockOf (SpedUp h n))) => Vec n h -> Batch n (SpedUp h n)
+sweep :: forall n h. (KnownPos n, UHard h, UHard (SpedUp h n), KnownPos (ClockOf h), KnownPos (ClockOf (SpedUp h n))) => Vec n h -> Batch n (SpedUp h n)
 sweep = sweepMux . upsample @(Vec n h) @n
 
 -- Iterate through the values of a Vec in a single base tick
-collect :: forall n h. (KnownPos n, UHard h, UHard (SpedUp h n), UHard (ReClock h 0), KnownPos (ClockOf h), KnownPos (ClockOf (SpedUp h n)), ReClock (SpedUp h n) 0 ~ ReClock h 0, ClockOf (ReClock h 0) ~ 0) => Vec n (ReClock h 0) -> Batch n (SpedUp h n) -> Vec n h
+collect :: forall n h. (KnownPos n, UHard h, UHard (SpedUp h n), KnownPos (ClockOf h), KnownPos (ClockOf (SpedUp h n)), ReClock (SpedUp h n) 0 ~ ReClock h 0) => Vec n (ReClock h 0) -> Batch n (SpedUp h n) -> Vec n h
 collect ini b = reg ini $ V.reverse $ V.map unBatch $ V.iterate @n (shift (dontcare () :: ReClock h 0)) b
 
 -- Apply f every n fast ticks, with an offset of i
@@ -109,28 +109,28 @@ zipWithRaw f xs ys = lift (uncurry f) $ zip xs ys
 
 -- Short delay, "shifting" values one tick toward the future,
 -- with a constant value for the first ever tick
-shift :: forall n a. (KnownPos n, UHard a, UHard (ReClock a 0), KnownPos (ClockOf a)) => ReClock a 0 -> Batch n a -> Batch n a
+shift :: forall n a. (KnownPos n, UHard a, KnownPos (ClockOf a)) => ReClock a 0 -> Batch n a -> Batch n a
 shift ini x = Batch $ delay ini $ lazyUnwrap x
 
 -- Short delay, "shifting" values one tick toward the future,
 -- resetting to a dynamic value every n ticks.
 -- ini[i] is used iff i%n == 0
 -- Tip: ini can typically be `replicate cst`
-shiftReset :: forall n a. (KnownPos n, UHard a, UHard (ReClock a 0), KnownPos (ClockOf a), KnownNat (ClockOf (ReClock a 0))) => Batch n a -> Batch n a -> Batch n a
+shiftReset :: forall n a. (KnownPos n, UHard a, KnownPos (ClockOf a)) => Batch n a -> Batch n a -> Batch n a
 shiftReset ini x = pulseMux @0 ini $ shift (dontcare ()) x
 
 -- Composed short delays, "shifting" values one whole base tick toward the future
-fullDelay :: forall n a. (KnownPos n, UHard a, UHard (ReClock a 0), KnownPos (ClockOf a)) => ReClock a 0 -> Batch n a -> Batch n a
+fullDelay :: forall n a. (KnownPos n, UHard a, KnownPos (ClockOf a)) => ReClock a 0 -> Batch n a -> Batch n a
 fullDelay ini x = Prelude.iterate (shift @n ini) x !! (valueOf @n)
 
 -- Compute iterations of a circuit without slowing it down
 -- Output: [fst (ini `f` x[0]), fst((snd (ini `f` x[0])) `f` x[1]), ...]
-scan :: forall n a b c. (KnownPos n, UHard a, UHard b, UHard (ReClock b 0), UHard c, KnownPos (ClockOf c)) => (b -> a -> (b, c)) -> ReClock b 0 -> Batch n a -> Batch n c
+scan :: forall n a b c. (KnownPos n, UHard a, UHard b, UHard c, KnownPos (ClockOf c)) => (b -> a -> (b, c)) -> ReClock b 0 -> Batch n a -> Batch n c
 scan f ini x = let (state, ret) = unzip $ zipWithRaw f (shift ini state) x in ret
 
 -- Compute iterations of a circuit without slowing it down,
 -- Resetting loopback every n fast ticks
 -- ini[i] is used iff i%n == 0
 -- Output: [fst (ini[0] `f` x[0]), fst((snd (ini `f` x[0])) `f` x[1]), ..., fst (ini[n] `f` x[n]), ...]
-scanReset :: forall n a b c. (KnownPos n, UHard a, UHard b, UHard (ReClock b 0), KnownNat (ClockOf (ReClock b 0)), UHard c, KnownPos (ClockOf c)) => (b -> a -> (b, c)) -> Batch n b -> Batch n a -> Batch n c
+scanReset :: forall n a b c. (KnownPos n, UHard a, UHard b, UHard c, KnownPos (ClockOf c)) => (b -> a -> (b, c)) -> Batch n b -> Batch n a -> Batch n c
 scanReset f ini x = let (state, ret) = unzip $ zipWithRaw f (shiftReset ini state) x in ret
