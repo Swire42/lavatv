@@ -99,4 +99,4 @@ cv1 :: forall n. KnownPos n => HInteger 1 -> Vec n (HInteger 1) -> HInteger 1
 cv1 xs ws = snd $ V.foldl cv1cell (xs, hinteger 0) ws
 
 cv2 :: forall m k. (KnownPos m, KnownPos k) => HInteger 1 -> Vec (m*k) (HInteger 1) -> HInteger 1
-cv2 xs ws = snd $ B.fold @m (V.foldl @k cv1cell) (hinteger 0, hinteger 0) (xs, hinteger 0) (B.sweep @m $ V.unconcat ws)
+cv2 xs ws = snd $ B.fold (V.foldl cv1cell) (dontcare ()) (xs, hinteger 0) (B.sweep @m $ V.unconcat ws)
