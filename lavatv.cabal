@@ -70,6 +70,7 @@ library
         Lavatv.Verif
         Lavatv.Batch
         Lavatv.HBool
+        Lavatv.HInteger
         Lavatv.BV
         Lavatv.Sim
 

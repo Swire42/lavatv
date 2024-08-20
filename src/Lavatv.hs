@@ -10,6 +10,7 @@ import qualified Lavatv.Batch as B
 
 import Lavatv.Core
 import Lavatv.HBool
+import Lavatv.HInteger
 import Lavatv.BV
 import Lavatv.Sim
 import Lavatv.Verif
@@ -75,3 +76,13 @@ sim3 :: forall clk. (KnownPos clk) => Sim Int clk -> Sim Int clk
 sim3 y = reg @_ @3 (simLift0 0) x
   where
     x :: Sim Int (3*clk) = (simLift2 (+)) (delay (simLift0 0) x) (upsample @_ @3 y)
+
+integ :: forall clk. KnownPos clk => HInteger clk -> HInteger clk
+integ i = o
+  where o = hadd i $ delay (hinteger 0) o
+
+integ_space :: Vec 2 (HInteger 1) -> Vec 2 (HInteger 1)
+integ_space = V.map integ
+
+integ_time :: Vec 2 (HInteger 1) -> Vec 2 (HInteger 1)
+integ_time = B.collect (V.replicate $ hinteger 0) . B.map integ . B.sweep
