@@ -67,9 +67,9 @@ pulseMux rare often = zipWithRaw (HB.hite) (pulse @i @n) (zip rare often)
 
 -- Iterate through the values of a Vec over n base ticks
 sweepMux :: forall n h. (KnownPos n, UHard h, KnownPos (ClockOf h)) => Vec n h -> Batch n h
-sweepMux v = Batch $ V.select @0 $ unBatch shreg
+sweepMux v = Batch $ V.foldr (\(active, x) next -> HB.hite active (x, next)) (dontcare ()) (hot `V.zip` v)
   where
-    shreg = shiftReset (Batch @n v) (lift V.rotateL shreg) -- note: inneficient
+    hot = V.zipWith ($) (delay HB.htrue `V.Cons` V.replicate (delay HB.hfalse)) (V.rotateR hot)
 
 -- Iterate through the values of a Vec in a single base tick
 sweep :: forall n h. (KnownPos n, UHard h, UHard (SpedUp h n), KnownPos (ClockOf h), KnownPos (ClockOf (SpedUp h n))) => Vec n h -> Batch n (SpedUp h n)

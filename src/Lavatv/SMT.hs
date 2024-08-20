@@ -116,27 +116,23 @@ declareTickState prefix net = vcat $ map decl livenet
         _ -> empty
 
 quantifyTickInput :: Doc -> Netlist -> Doc -> Doc
-quantifyTickInput prefix net body = foldr decl body livenet
+quantifyTickInput prefix net body = if decls /= empty then parens $ text "forall" <+> parens decls <+> body else body
   where
     livenet = filter (\s -> sigClock (sigInfo s) > 0) net
+    decls = hsep $ map decl livenet
     decl s = case sigDef s of
-        Comb DontCare -> \b -> parens $ text "forall" 
-            <+> (parens $ parens $ sigRef prefix undefined s <+> text (sigSmt2Type (sigInfo s)))
-            <+> b
-        Comb (Symbolic _) -> \b -> parens $ text "forall" 
-            <+> (parens $ parens $ sigRef prefix undefined s <+> text (sigSmt2Type (sigInfo s)))
-            <+> b
-        _ -> id
+        Comb DontCare -> parens $ sigRef prefix undefined s <+> text (sigSmt2Type (sigInfo s))
+        Comb (Symbolic _) -> parens $ sigRef prefix undefined s <+> text (sigSmt2Type (sigInfo s))
+        _ -> empty
 
 quantifyTickState :: Doc -> Netlist -> Doc -> Doc
-quantifyTickState prefix net body = foldr decl body livenet
+quantifyTickState prefix net body = if decls /= empty then parens $ text "exists" <+> parens decls <+> body else body
   where
     livenet = filter (\s -> sigClock (sigInfo s) > 0) net
+    decls = hsep $ map decl livenet
     decl s = case sigDef s of
-        Reg _ _ _ -> \b -> parens $ text "exists" 
-            <+> (parens $ parens $ sigRef prefix (text "reg") s <+> text (sigSmt2Type (sigInfo s)))
-            <+> b
-        _ -> id
+        Reg _ _ _ -> parens $ sigRef prefix (text "reg") s <+> text (sigSmt2Type (sigInfo s))
+        _ -> empty
 
 initialConstraint :: Doc -> Netlist -> Doc
 initialConstraint prefix net = vcat $ map cstr net
