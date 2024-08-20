@@ -50,6 +50,7 @@ module Lavatv.Vec (
   Lavatv.Vec.foldl1,
   Lavatv.Vec.scanr,
   Lavatv.Vec.scanl,
+  Lavatv.Vec.row,
   Lavatv.Vec.and,
   Lavatv.Vec.or,
   Lavatv.Vec.any,
@@ -207,6 +208,9 @@ scanr f e = reverse . scanl (\b a -> f a b) e . reverse
 
 scanl :: forall n a b. KnownNat n => (b -> a -> b) -> b -> Vec n a -> Vec n b
 scanl f e xss = ifZero @n Nil (let x `Cons` xs = xss in let y = (e `f` x) in y `Cons` scanl f y xs)
+
+row :: forall n a b c. KnownPos n => (b -> a -> (c, b)) -> b -> Vec n a -> (Vec n c, b)
+row f e xss = let (zs, ys) = unzip $ scanl (\(_, x) -> f x) (undefined, e) xss in (zs, last ys)
 
 and :: forall n. KnownNat n => Vec n Bool -> Bool
 and = foldl (&&) True

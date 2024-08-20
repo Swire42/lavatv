@@ -112,10 +112,10 @@ class (Hard h, UHard (ReClock h 0), ClockOf (ReClock h 0) ~ 0, ReClock (ReClock 
     cstsample :: forall clk. (KnownPos clk, ClockOf h ~ 0, UHard (ReClock h clk)) => h -> ReClock h clk
     cstsample = pack . map (sig_cstsample (valueOf @clk)) . unpack
 
-    upsample :: forall k. (KnownPos k, KnownPos (ClockOf h), UHard (SpedUp h k)) => h -> SpedUp h k
+    upsample :: forall k. (KnownPos k, KnownPos (ClockOf h), UHard (SpedUp k h)) => h -> SpedUp k h
     upsample = pack . map (sig_upsample (valueOf @(k * ClockOf h)) (valueOf @k)) . unpack
 
-    reg :: forall k. (KnownPos k, KnownPos (ClockOf h), UHard (SpedUp h k)) => ReClock h 0 -> SpedUp h k -> h
+    reg :: forall k. (KnownPos k, KnownPos (ClockOf h), UHard (SpedUp k h)) => ReClock h 0 -> SpedUp k h -> h
     reg ini nxt = pack $ zipWith (\i n -> sig_reg (valueOf @(ClockOf h)) i (valueOf @k) n) (unpack ini) (unpack nxt)
 
     delay :: (KnownPos (ClockOf h)) => ReClock h 0 -> h -> h
@@ -125,7 +125,7 @@ class (Hard h, UHard (ReClock h 0), ClockOf (ReClock h 0) ~ 0, ReClock (ReClock 
 
     symbolic :: KnownNat (ClockOf h) => String -> h
 
-type SpedUp h (k :: Nat) = ReClock h (k * ClockOf h)
+type SpedUp (k :: Nat) h = ReClock h (k * ClockOf h)
 
 data HUnit (clk :: Nat) = HUnit
 

@@ -7,6 +7,7 @@ import Lavatv.Vec(Vec)
 import qualified Lavatv.Vec as V
 import Lavatv.Batch(Batch)
 import qualified Lavatv.Batch as B
+import Control.Arrow((***))
 
 import Lavatv.Core
 import Lavatv.HBool
@@ -44,7 +45,7 @@ rippleAdder a b = s
 batchAdder :: forall clk n. _ => Batch n (Bit clk) -> Batch n (Bit clk) -> Batch n (Bit clk)
 batchAdder a b = s
   where
-    s = B.scanReset kernel (B.Batch bvZeros) (B.zip a b)
+    s = B.scan' kernel (B.Batch bvZeros) (B.zip a b)
     kernel ci (a', b') = let (s', co) = fullAdder a' b' ci in (co, s')
 
 mux (sel :: Bit _) (x0 :: Bit _, x1 :: Bit _) = (x :: Bit _)
@@ -62,7 +63,7 @@ tmap2 (f :: forall a. Bit a -> Bit a) (x :: Bit clk, y :: Bit clk) = (fx :: Bit 
 
 tmap2b (f :: forall a. Bit a -> Bit a) (xs :: Vec 2 (Bit clk)) = (fxs :: Vec 2 (Bit clk))
   where
-    fxs = B.collect (V.replicate bvZeros) $ B.lift f $ B.sweep xs
+    fxs = B.collect (V.replicate bvZeros) $ B.map f $ B.sweep xs
 
 sim0 :: forall clk. (KnownPos clk) => Sim Int clk -> Sim Int clk
 sim0 _ = cstsample $ simLift0 42
@@ -86,3 +87,16 @@ integ_space = V.map integ
 
 integ_time :: Vec 2 (HInteger 1) -> Vec 2 (HInteger 1)
 integ_time = B.collect (V.replicate $ hinteger 0) . B.map integ . B.sweep
+
+
+cvcell :: forall clk. KnownNat clk => (HInteger clk, HInteger clk) -> HInteger clk -> (HInteger clk, HInteger clk)
+cvcell (x, acc) w = (x, (x `hmul` w) `hadd` acc)
+
+cv1cell :: forall clk. KnownPos clk => (HInteger clk, HInteger clk) -> HInteger clk -> (HInteger clk, HInteger clk)
+cv1cell (x, acc) w = (delay (hinteger 0) *** id) $ cvcell (x, acc) w
+
+cv1 :: forall n. KnownPos n => HInteger 1 -> Vec n (HInteger 1) -> HInteger 1
+cv1 xs ws = snd $ V.foldl cv1cell (xs, hinteger 0) ws
+
+cv2 :: forall m k. (KnownPos m, KnownPos k) => HInteger 1 -> Vec (m*k) (HInteger 1) -> HInteger 1
+cv2 xs ws = snd $ B.fold @m (V.foldl @k cv1cell) (hinteger 0, hinteger 0) (xs, hinteger 0) (B.sweep @m $ V.unconcat ws)
