@@ -88,9 +88,9 @@ data SigComb = forall n. KnownNat n => GateOp (Gate n) (Vec n Signal)
              | Symbolic String
 
 data SigDef = Comb SigComb
-             | CstSample Int Signal
-             | UpSample Int Signal
-             | Reg Signal Int Signal
+            | CstSample Int Signal
+            | UpSample Int Signal
+            | Reg Signal Int Signal
 
 data Signal = Signal { sigUniq :: Uniq, sigInfo :: SigInfo, sigDef :: SigDef }
 
