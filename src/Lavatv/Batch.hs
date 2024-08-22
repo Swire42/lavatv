@@ -141,22 +141,28 @@ fullDelay :: forall n a. (KnownPos n, UHard a, KnownPos (ClockOf a)) => ReClock 
 fullDelay ini x = Prelude.iterate (shiftRaw @n ini) x !! (valueOf @n)
 
 -- Compute iterations of a circuit without slowing it down
--- Output: [fst (ini `f` x[0]), fst((snd (ini `f` x[0])) `f` x[1]), ...]
+-- Output: [fst (e `f` x[0]), fst((snd (e `f` x[0])) `f` x[1]), ...]
 scanRaw :: forall n a b c. (KnownPos n, UHard a, UHard b, UHard c, KnownPos (ClockOf c)) => (b -> a -> (b, c)) -> ReClock b 0 -> Batch n a -> Batch n c
-scanRaw f ini x = let (state, ret) = unzip $ zipWithRaw f (shiftRaw ini state) x in ret
+scanRaw f e x = let (state, ret) = unzip $ zipWithRaw f (shiftRaw e state) x in ret
 
--- Compute iterations of a circuit without slowing it down,
+-- Compute iterations of a slowed down circuit,
 -- Resetting loopback every n fast ticks
 -- ini[i] is used iff i%n == 0
 -- Output: [fst (ini[0] `f` x[0]), fst((snd (ini `f` x[0])) `f` x[1]), ..., fst (ini[n] `f` x[n]), ...]
 scan' :: forall n a b c. _ => (b -> a -> (c, b)) -> Batch n b -> Batch n a -> Batch n c
 scan' f e x = let (ret, acc) = unzip $ zipWith f (shift' e acc) x in ret
 
-scan :: forall n a b c. _ => (SpedUp n b -> a -> (c, SpedUp n b)) -> b -> Batch n a -> TVec n c
+-- Compute iterations of a slowed down circuit,
+-- Resetting loopback every n fast ticks
+-- e is used as the loopback reset value
+-- Output: [fst (e[0] `f` x[0]), fst((snd (e `f` x[0])) `f` x[1]), ..., fst (e[1] `f` x[n]), ...]
+scan :: forall n a b c. _ => (SpedUp n b -> a -> (c, SpedUp n b)) -> b -> Batch n a -> Batch n c
 scan f e x = let (ret, acc) = unzip $ zipWith f (shift e acc) x in ret
 
-row :: forall n a b c. _ => (SpedUp n b -> a -> (c, SpedUp n b)) -> ReClock b 0 -> b -> Batch n a -> (TVec n c, b)
+-- Equivalent of Lava's row, needs an additional initial value for the second part of the result
+row :: forall n a b c. _ => (SpedUp n b -> a -> (c, SpedUp n b)) -> ReClock b 0 -> b -> Batch n a -> (Batch n c, b)
 row f ini e x = let (ret, acc) = unzip $ zipWith f (shift e acc) x in (ret, last ini acc)
 
+-- Equivalent of the usual fold, needs an additional initial value for the result
 fold :: forall n a b. _ => (SpedUp n b -> a -> SpedUp n b) -> ReClock b 0 -> b -> Batch n a -> b
 fold f ini e x = let acc = zipWith f (shift e acc) x in last ini acc
